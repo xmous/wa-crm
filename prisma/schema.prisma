@@ -1,0 +1,170 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  ADMIN
+  AGENT
+}
+
+enum AccountStatus {
+  QR_READY
+  CONNECTED
+  DISCONNECTED
+  BANNED_DETECTED
+}
+
+enum ConversationStatus {
+  BOT_ACTIVE
+  NEEDS_AGENT
+  AGENT_ASSIGNED
+  RESOLVED
+}
+
+enum SenderType {
+  CUSTOMER
+  BOT
+  AGENT
+  SYSTEM
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String
+  passwordHash  String
+  role          UserRole       @default(AGENT)
+  isActive      Boolean        @default(true)
+  conversations Conversation[] @relation("AssignedAgent")
+  sentMessages  Message[]      @relation("AgentMessages")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model WhatsappAccount {
+  id              String           @id @default(uuid())
+  labelName       String
+  phoneNumber     String?          @unique
+  status          AccountStatus    @default(DISCONNECTED)
+  authKeysJson    Json?
+  dailyLimit      Int              @default(150)
+  sentToday       Int              @default(0)
+  lastResetDate   DateTime         @default(now())
+  conversations   Conversation[]
+  broadcastQueues BroadcastQueue[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Contact {
+  id            String         @id @default(uuid())
+  phoneNumber   String         @unique
+  name          String?
+  isBlacklisted Boolean        @default(false)
+  blacklistedAt DateTime?
+  conversations Conversation[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Conversation {
+  id                String             @id @default(uuid())
+  whatsappAccountId String
+  whatsappAccount   WhatsappAccount    @relation(fields: [whatsappAccountId], references: [id], onDelete: Cascade)
+  contactId         String
+  contact           Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status            ConversationStatus @default(BOT_ACTIVE)
+  assignedAgentId   String?
+  assignedAgent     User?              @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  lastMessageAt     DateTime           @default(now())
+  messages          Message[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([whatsappAccountId, contactId])
+}
+
+model Message {
+  id                String           @id @default(uuid())
+  conversationId    String
+  conversation      Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction         MessageDirection
+  senderType        SenderType
+  agentId           String?
+  agent             User?            @relation("AgentMessages", fields: [agentId], references: [id])
+  agentNameSnapshot String?
+  text              String
+  mediaUrl          String?
+  status            MessageStatus    @default(PENDING)
+  failureReason     String?
+  createdAt         DateTime         @default(now())
+}
+
+model BotRule {
+  id          String   @id @default(uuid())
+  triggerType String   // EXACT, CONTAINS, REGEX, NUMERIC_MENU
+  keyword     String
+  replyText   String
+  action      String   @default("REPLY") // REPLY, HANDOVER_AGENT
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BroadcastCampaign {
+  id              String           @id @default(uuid())
+  title           String
+  messageTemplate String
+  status          CampaignStatus   @default(DRAFT)
+  totalTargets    Int              @default(0)
+  sentCount       Int              @default(0)
+  failedCount     Int              @default(0)
+  scheduledAt     DateTime?
+  queues          BroadcastQueue[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model BroadcastQueue {
+  id                String            @id @default(uuid())
+  campaignId        String
+  campaign          BroadcastCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  whatsappAccountId String
+  whatsappAccount   WhatsappAccount   @relation(fields: [whatsappAccountId], references: [id])
+  recipientPhone    String
+  renderedText      String
+  status            MessageStatus     @default(QUEUED)
+  failureReason     String?
+  scheduledSendAt   DateTime          @default(now())
+  sentAt            DateTime?
+  createdAt         DateTime          @default(now())
+}
