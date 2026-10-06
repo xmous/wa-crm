@@ -6,19 +6,24 @@ export const reportRouter = Router();
 // Summary overview metrics
 reportRouter.get('/summary', async (_req: Request, res: Response) => {
   try {
-    const [totalContacts, totalMessages, botReplies, agentReplies, totalCampaigns] = await Promise.all([
+    const [totalContacts, liveMessages, botReplies, agentReplies, totalCampaigns, broadcastSent] = await Promise.all([
       prisma.contact.count(),
       prisma.message.count(),
       prisma.message.count({ where: { senderType: 'BOT' } }),
       prisma.message.count({ where: { senderType: 'AGENT' } }),
-      prisma.broadcastCampaign.count()
+      prisma.broadcastCampaign.count(),
+      prisma.broadcastQueue.count({ where: { status: 'SENT' } })
     ]);
+
+    const totalMessages = liveMessages + broadcastSent;
 
     return res.json({
       success: true,
       data: {
         totalContacts,
         totalMessages,
+        liveMessages,
+        broadcastSent,
         botReplies,
         agentReplies,
         totalCampaigns
