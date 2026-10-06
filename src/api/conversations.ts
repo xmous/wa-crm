@@ -107,14 +107,17 @@ conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
       }
     }
 
-    // 2. Record Message with explicit AGENT ID & Name Snapshot
+    // 2. Record Message with explicit AGENT ID & Account Name Snapshot
+    const account = await prisma.whatsappAccount.findUnique({ where: { id: conversation.whatsappAccountId } });
+    const staffLabel = `${agentName || 'Customer Service'} (${account?.labelName || 'WA'})`;
+
     const message = await prisma.message.create({
       data: {
         conversationId: id,
         direction: 'OUTBOUND',
         senderType: 'AGENT',
         agentId: agentId || null,
-        agentNameSnapshot: agentName || 'Customer Service',
+        agentNameSnapshot: staffLabel,
         text,
         status: 'SENT'
       }

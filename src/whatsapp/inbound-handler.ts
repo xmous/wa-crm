@@ -126,12 +126,15 @@ export async function handleOutboundFromPhone(accountId: string, remoteJid: stri
     });
   }
 
+  const account = await prisma.whatsappAccount.findUnique({ where: { id: accountId } });
+  const accountLabel = account ? account.labelName : 'HP';
+
   await prisma.message.create({
     data: {
       conversationId: conversation.id,
       direction: 'OUTBOUND',
       senderType: 'AGENT',
-      agentNameSnapshot: 'HP WhatsApp',
+      agentNameSnapshot: `HP WhatsApp (${accountLabel})`,
       text,
       status: 'SENT'
     }

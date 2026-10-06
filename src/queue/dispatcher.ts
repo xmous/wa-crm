@@ -1,5 +1,5 @@
 import { prisma } from '../database/client';
-import { SessionManager } from '../whatsapp/session-manager';
+import { SessionManager, sessionEvents } from '../whatsapp/session-manager';
 import { getRandomDelay, sleep } from '../utils/delay';
 import { config } from '../config';
 
@@ -105,6 +105,60 @@ export class QueueDispatcher {
             where: { id: job.campaignId },
             data: { status: 'COMPLETED' }
           });
+        }
+
+        // 4. Mirror sent broadcast to Conversation & Message so it appears in Live Inbox
+        try {
+          const account = await prisma.whatsappAccount.findUnique({ where: { id: accountId } });
+          const contact = await prisma.contact.upsert({
+            where: { phoneNumber: job.recipientPhone },
+            create: { phoneNumber: job.recipientPhone },
+            update: {}
+          });
+
+          let conv = await prisma.conversation.findUnique({
+            where: {
+              whatsappAccountId_contactId: {
+                whatsappAccountId: accountId,
+                contactId: contact.id
+              }
+            }
+          });
+
+          if (!conv) {
+            conv = await prisma.conversation.create({
+              data: {
+                whatsappAccountId: accountId,
+                contactId: contact.id,
+                status: 'BOT_ACTIVE'
+              }
+            });
+          } else {
+            await prisma.conversation.update({
+              where: { id: conv.id },
+              data: { lastMessageAt: new Date() }
+            });
+          }
+
+          await prisma.message.create({
+            data: {
+              conversationId: conv.id,
+              direction: 'OUTBOUND',
+              senderType: 'SYSTEM',
+              agentNameSnapshot: `🚀 Broadcast (${account?.labelName || 'WA'})`,
+              text: job.renderedText,
+              status: 'SENT'
+            }
+          });
+
+          sessionEvents.emit('message:inbound', {
+            accountId,
+            senderJid: toJid,
+            text: job.renderedText,
+            conversationId: conv.id
+          });
+        } catch (mirrorErr: any) {
+          console.warn('Failed to mirror broadcast to Live Inbox:', mirrorErr.message);
         }
       } catch (sendErr: any) {
         console.error(`Failed to send broadcast to ${job.recipientPhone}:`, sendErr.message);

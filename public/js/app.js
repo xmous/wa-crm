@@ -484,8 +484,24 @@ function renderMessagesStream(messages) {
     const isOutbound = m.direction === 'OUTBOUND';
     const rowClass = isOutbound ? 'outbound' : 'inbound';
     const isBot = m.senderType === 'BOT';
+    const isSystem = m.senderType === 'SYSTEM';
     const bubbleClass = isBot ? 'bot-bubble' : '';
-    const staffName = m.agentNameSnapshot || (m.agent ? m.agent.name : (isBot ? 'Bot Otomatis' : 'CS'));
+    const staffName = m.agentNameSnapshot || (m.agent ? m.agent.name : (isBot ? 'Bot Otomatis' : (isSystem ? '🚀 Broadcast' : 'CS')));
+
+    let statusTick = '';
+    if (isOutbound) {
+      if (m.status === 'READ') {
+        statusTick = '<span class="status-ticks" style="color:#53bdeb; font-weight:bold; margin-left:4px;" title="Sudah Dibaca Pelanggan">✓✓</span>';
+      } else if (m.status === 'DELIVERED') {
+        statusTick = '<span class="status-ticks" style="color:#8696a0; margin-left:4px;" title="Terkirim ke WhatsApp HP">✓✓</span>';
+      } else if (m.status === 'FAILED') {
+        statusTick = '<span class="status-ticks" style="color:#ef4444; margin-left:4px;" title="Gagal Terkirim">⚠️</span>';
+      } else {
+        statusTick = '<span class="status-ticks" style="color:#8696a0; margin-left:4px;" title="Terkirim ke Server WhatsApp">✓</span>';
+      }
+    }
+
+    const tagType = isBot ? 'bot' : (isSystem ? 'system' : 'cs');
 
     return `
       <div class="msg-row ${rowClass}">
@@ -493,8 +509,9 @@ function renderMessagesStream(messages) {
           ${m.text}
         </div>
         <div class="msg-info-sub">
-          ${isOutbound ? `<span class="sender-tag ${isBot ? 'bot' : 'cs'}">${staffName}</span> • ` : ''}
+          ${isOutbound ? `<span class="sender-tag ${tagType}">${staffName}</span> • ` : ''}
           <span>${new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          ${statusTick}
         </div>
       </div>
     `;

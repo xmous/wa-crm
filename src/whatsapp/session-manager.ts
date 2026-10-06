@@ -139,7 +139,73 @@ export class SessionManager {
       }
     });
 
-    // 2. Helper to safely store contact in PostgreSQL
+    // 2. Listen for Message Delivery & Read Receipts from WhatsApp
+    socket.ev.on('messages.update', async (updates) => {
+      try {
+        for (const u of updates) {
+          if (!u.key || !u.update) continue;
+          const statusNum = (u.update as any).status;
+          let mappedStatus: 'SENT' | 'DELIVERED' | 'READ' | null = null;
+          if (statusNum === 3) {
+            mappedStatus = 'DELIVERED';
+          } else if (statusNum === 4 || statusNum === 5) {
+            mappedStatus = 'READ';
+          }
+
+          if (mappedStatus && u.key.remoteJid) {
+            const rawJid = u.key.remoteJid;
+            const phone = rawJid.split('@')[0].split(':')[0];
+            const contact = await prisma.contact.findFirst({
+              where: {
+                OR: [
+                  { phoneNumber: phone },
+                  { phoneNumber: { contains: phone } }
+                ]
+              }
+            });
+
+            if (contact) {
+              const conv = await prisma.conversation.findUnique({
+                where: {
+                  whatsappAccountId_contactId: {
+                    whatsappAccountId: accountId,
+                    contactId: contact.id
+                  }
+                }
+              });
+
+              if (conv) {
+                const latestOutbound = await prisma.message.findFirst({
+                  where: {
+                    conversationId: conv.id,
+                    direction: 'OUTBOUND'
+                  },
+                  orderBy: { createdAt: 'desc' }
+                });
+
+                if (latestOutbound && latestOutbound.status !== 'READ') {
+                  await prisma.message.update({
+                    where: { id: latestOutbound.id },
+                    data: { status: mappedStatus }
+                  });
+
+                  sessionEvents.emit('message:inbound', {
+                    accountId,
+                    senderJid: rawJid,
+                    text: latestOutbound.text,
+                    conversationId: conv.id
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn('Status receipt error:', err.message);
+      }
+    });
+
+    // 3. Helper to safely store contact in PostgreSQL
     const handleSaveContact = async (rawJid: string, name?: string | null) => {
       if (!rawJid || rawJid.endsWith('@g.us') || rawJid.includes('status@broadcast')) return;
       const phone = rawJid.split('@')[0].split(':')[0];
