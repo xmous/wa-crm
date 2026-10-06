@@ -37,18 +37,53 @@ socket.on('wa:qr', (data) => {
   }
 });
 
+// Sleek Floating Toast Notification System
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icons = {
+    success: '✅',
+    error: '❌',
+    warning: '⚠️',
+    info: 'ℹ️'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
+    <span class="toast-msg">${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 250);
+  }, 3500);
+}
+
 socket.on('wa:connected', (data) => {
   console.log('WhatsApp connected:', data);
   loadAccounts();
   const modal = document.getElementById('qr-modal');
   if (modal && state.activeQrAccountId === data.accountId) {
     modal.style.display = 'none';
-    alert(`Nomor WhatsApp ${data.phone || ''} berhasil terhubung!`);
+    state.activeQrAccountId = null;
+    showToast(`Nomor WhatsApp ${data.phone || ''} berhasil terhubung!`, 'success');
   }
 });
 
 socket.on('wa:banned', (data) => {
-  alert(`⚠️ PERINGATAN KEAMANAN: Akun WhatsApp ${data.accountId} terdeteksi bermasalah/diblokir oleh WhatsApp! Sistem otomatis mem-pause antrean untuk nomor ini.`);
+  showToast(`⚠️ Akun WhatsApp ${data.accountId} terdeteksi bermasalah/diblokir oleh WhatsApp! Sistem otomatis mem-pause antrean.`, 'error');
   loadAccounts();
 });
 
@@ -435,7 +470,7 @@ function initBroadcast() {
       .map(phone => ({ phone }));
 
     if (recipients.length === 0) {
-      alert('Masukkan minimal 1 nomor tujuan yang valid.');
+      showToast('Masukkan minimal 1 nomor tujuan yang valid.', 'warning');
       return;
     }
 
@@ -447,11 +482,11 @@ function initBroadcast() {
       });
       const json = await res.json();
       if (json.success) {
-        alert(`Kampanye "${title}" berhasil didaftarkan ke antrean dengan ${json.totalQueued} pesan.`);
+        showToast(`Kampanye "${title}" berhasil didaftarkan ke antrean dengan ${json.totalQueued} pesan.`, 'success');
         form.reset();
         loadCampaigns();
       } else {
-        alert(json.error || 'Gagal membuat kampanye.');
+        showToast(json.error || 'Gagal membuat kampanye.', 'error');
       }
     } catch (err) {
       console.error(err);

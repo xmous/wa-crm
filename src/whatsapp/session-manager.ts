@@ -58,8 +58,12 @@ export class SessionManager {
 
       if (connection === 'open') {
         const phone = socket.user?.id.split(':')[0];
+        const isAlreadyConnected = this.sessions.has(accountId);
         this.sessions.set(accountId, socket);
-        sessionEvents.emit('connected', { accountId, phone });
+        this.lastQrMap.delete(accountId);
+        if (!isAlreadyConnected) {
+          sessionEvents.emit('connected', { accountId, phone });
+        }
         try {
           await prisma.whatsappAccount.update({
             where: { id: accountId },
