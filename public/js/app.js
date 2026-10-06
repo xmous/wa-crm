@@ -372,11 +372,14 @@ function applyUserRole(user) {
   const broadcastTab = document.getElementById('tab-btn-broadcast');
   const reportsTab = document.getElementById('tab-btn-reports');
 
+  const adminToolbar = document.getElementById('admin-inbox-toolbar');
+
   if (user.role === 'AGENT') {
     if (accountsTab) accountsTab.style.display = 'none';
     if (botRulesTab) botRulesTab.style.display = 'none';
     if (broadcastTab) broadcastTab.style.display = 'none';
     if (reportsTab) reportsTab.style.display = 'none';
+    if (adminToolbar) adminToolbar.style.display = 'none';
     
     // Switch to inbox if on hidden view
     if (['accounts', 'bot-rules', 'broadcast', 'reports'].includes(state.currentTab)) {
@@ -387,6 +390,8 @@ function applyUserRole(user) {
     if (botRulesTab) botRulesTab.style.display = 'flex';
     if (broadcastTab) broadcastTab.style.display = 'flex';
     if (reportsTab) reportsTab.style.display = 'flex';
+    if (adminToolbar) adminToolbar.style.display = 'flex';
+    loadAgentsList();
   }
 }
 
@@ -429,6 +434,44 @@ function switchTab(target) {
 // ==========================================================================
 // View 1: Live Inbox Module
 // ==========================================================================
+let cachedAgents = [];
+
+async function loadAgentsList() {
+  try {
+    const res = await fetch('/api/conversations/agents');
+    const json = await res.json();
+    if (json.success && Array.isArray(json.data)) {
+      cachedAgents = json.data;
+      populateAdminAgentFilter();
+      populateReassignDropdown();
+    }
+  } catch (err) {
+    console.warn('Failed to load agents list:', err);
+  }
+}
+
+function populateAdminAgentFilter() {
+  const select = document.getElementById('admin-agent-filter');
+  if (!select) return;
+  const currentVal = select.value || 'ALL';
+  select.innerHTML = `
+    <option value="ALL">👥 Semua CS (All)</option>
+    <option value="UNASSIGNED">⏳ Belum Ada CS</option>
+    ${cachedAgents.map(a => `<option value="${a.id}">🎧 ${a.name} (${a.role})</option>`).join('')}
+  `;
+  select.value = currentVal;
+}
+
+function populateReassignDropdown() {
+  const select = document.getElementById('select-reassign-agent');
+  if (!select) return;
+  select.innerHTML = `
+    <option value="">-- Alihkan CS --</option>
+    <option value="UNASSIGN">⚠️ Lepas ke Antrean Terbuka</option>
+    ${cachedAgents.map(a => `<option value="${a.id}">🎧 ${a.name}</option>`).join('')}
+  `;
+}
+
 function initInbox() {
   const replyInput = document.getElementById('reply-message-input');
   const sendBtn = document.getElementById('btn-send-reply');
@@ -436,6 +479,7 @@ function initInbox() {
   const searchInput = document.getElementById('chat-search');
 
   loadConversations();
+  loadAgentsList();
 
   sendBtn.addEventListener('click', sendReply);
   replyInput.addEventListener('keypress', (e) => {
@@ -448,6 +492,7 @@ function initInbox() {
     });
   }
 
+  // Claim chat
   assignBtn.addEventListener('click', async () => {
     if (!state.activeConversationId) return;
     try {
@@ -456,15 +501,15 @@ function initInbox() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId: state.currentUser.id })
       });
-      loadConversations();
-      loadActiveMessages(state.activeConversationId);
-      showToast('Chat berhasil diambil alih oleh Anda', 'success');
+      showToast('Chat berhasil diambil alih oleh Anda.', 'success');
+      await loadConversations();
+      selectConversation(state.activeConversationId);
     } catch (err) {
       console.error(err);
     }
   });
 
-  // Filter tabs
+  // Filter tabs (Semua, Belum Ada CS, Chat Saya, Selesai)
   document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
@@ -472,6 +517,144 @@ function initInbox() {
       renderConversationList(tab.dataset.filter);
     });
   });
+
+  // Close / Selesaikan Percakapan
+  const btnClose = document.getElementById('btn-close-conversation');
+  if (btnClose) {
+    btnClose.addEventListener('click', async () => {
+      if (!state.activeConversationId) return;
+      if (!confirm('Selesaikan sesi percakapan ini dan pindahkan ke arsip?')) return;
+      try {
+        const res = await fetch(`/api/conversations/${state.activeConversationId}/close`, { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('✅ Percakapan telah diselesaikan & diarsipkan.', 'success');
+          await loadConversations();
+          selectConversation(state.activeConversationId);
+        } else {
+          showToast(json.error || 'Gagal menyelesaikan percakapan.', 'error');
+        }
+      } catch (err) {
+        showToast('Kesalahan: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Buka Kembali Percakapan
+  const btnReopen = document.getElementById('btn-reopen-conversation');
+  if (btnReopen) {
+    btnReopen.addEventListener('click', async () => {
+      if (!state.activeConversationId) return;
+      try {
+        const res = await fetch(`/api/conversations/${state.activeConversationId}/reopen`, { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('🔄 Percakapan dibuka kembali.', 'success');
+          await loadConversations();
+          selectConversation(state.activeConversationId);
+        } else {
+          showToast(json.error || 'Gagal membuka kembali percakapan.', 'error');
+        }
+      } catch (err) {
+        showToast('Kesalahan: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Admin Agent Filter Change
+  const adminFilter = document.getElementById('admin-agent-filter');
+  if (adminFilter) {
+    adminFilter.addEventListener('change', () => {
+      renderConversationList();
+    });
+  }
+
+  // Admin Reassign Dropdown
+  const selectReassign = document.getElementById('select-reassign-agent');
+  if (selectReassign) {
+    selectReassign.addEventListener('change', async (e) => {
+      if (!state.activeConversationId) return;
+      const val = e.target.value;
+      if (!val) return;
+      const targetAgentId = val === 'UNASSIGN' ? null : val;
+      try {
+        const res = await fetch(`/api/conversations/${state.activeConversationId}/assign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId: targetAgentId })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('CS percakapan berhasil dialihkan.', 'success');
+          await loadConversations();
+          selectConversation(state.activeConversationId);
+        }
+      } catch (err) {
+        showToast('Gagal mengalihkan CS: ' + err.message, 'error');
+      }
+    });
+  }
+
+  // Edit / Beri Nama Kontak Modal Handlers
+  const btnEditContact = document.getElementById('btn-edit-contact-name');
+  const editContactModal = document.getElementById('edit-contact-modal');
+  const btnCloseEditModal = document.getElementById('btn-close-edit-contact');
+  const editContactForm = document.getElementById('edit-contact-form');
+  const editPhoneInput = document.getElementById('edit-contact-phone');
+  const editNameInput = document.getElementById('edit-contact-name-input');
+
+  if (btnEditContact) {
+    btnEditContact.addEventListener('click', () => {
+      const conv = state.conversations.find(c => c.id === state.activeConversationId);
+      if (!conv) return;
+      if (editPhoneInput) editPhoneInput.value = conv.contact?.phoneNumber || '-';
+      if (editNameInput) {
+        editNameInput.value = conv.contact?.name || '';
+        setTimeout(() => editNameInput.focus(), 100);
+      }
+      if (editContactModal) editContactModal.style.display = 'flex';
+    });
+  }
+
+  if (btnCloseEditModal && editContactModal) {
+    btnCloseEditModal.addEventListener('click', () => {
+      editContactModal.style.display = 'none';
+    });
+  }
+
+  if (editContactForm) {
+    editContactForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!state.activeConversationId) return;
+      const newName = editNameInput.value.trim();
+      if (!newName) return;
+
+      try {
+        const res = await fetch(`/api/conversations/${state.activeConversationId}/contact`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName })
+        });
+        const json = await res.json();
+        if (json.success && json.contact) {
+          if (editContactModal) editContactModal.style.display = 'none';
+          showToast(`Nama kontak berhasil disimpan: "${newName}"`, 'success');
+
+          // Update local state and UI
+          const conv = state.conversations.find(c => c.id === state.activeConversationId);
+          if (conv && conv.contact) {
+            conv.contact.name = newName;
+          }
+          selectConversation(state.activeConversationId);
+          renderConversationList();
+        } else {
+          showToast(json.error || 'Gagal mengubah nama kontak.', 'error');
+        }
+      } catch (err) {
+        showToast('Kesalahan: ' + err.message, 'error');
+      }
+    });
+  }
 }
 
 async function loadConversations() {
@@ -488,27 +671,65 @@ async function loadConversations() {
   }
 }
 
-function renderConversationList(filter = 'all', searchKeyword = '') {
+function renderConversationList(filter = null, searchKeyword = null) {
+  const activeTabFilter = filter || document.querySelector('.filter-tab.active')?.dataset.filter || 'all';
   const container = document.getElementById('conversations-container');
-  let list = state.conversations;
+  let list = [...state.conversations];
 
-  if (searchKeyword.trim()) {
-    const q = searchKeyword.toLowerCase().trim();
+  const searchInput = document.getElementById('chat-search');
+  const kw = (searchKeyword !== null ? searchKeyword : (searchInput?.value || '')).toLowerCase().trim();
+
+  if (kw) {
     list = list.filter(c => {
       const name = (c.contact?.name || '').toLowerCase();
       const phone = (c.contact?.phoneNumber || '').toLowerCase();
-      return name.includes(q) || phone.includes(q);
+      return name.includes(kw) || phone.includes(kw);
     });
   }
 
-  if (filter === 'unassigned') {
-    list = list.filter(c => !c.assignedAgentId);
-  } else if (filter === 'mine') {
-    list = list.filter(c => c.assignedAgentId === state.currentUser.id);
+  const isAdmin = state.currentUser?.role === 'ADMIN';
+
+  // 1. Multi-Agent Queue Isolation & Visibility
+  if (!isAdmin) {
+    // AGENT ROLE: HIDE all conversations that are taken by OTHER agents!
+    list = list.filter(c => {
+      if (c.assignedAgentId && c.assignedAgentId !== state.currentUser?.id) {
+        return false;
+      }
+      return true;
+    });
+
+    if (activeTabFilter === 'mine') {
+      list = list.filter(c => c.assignedAgentId === state.currentUser?.id && c.status !== 'RESOLVED');
+    } else if (activeTabFilter === 'unassigned') {
+      list = list.filter(c => !c.assignedAgentId && c.status !== 'RESOLVED');
+    } else if (activeTabFilter === 'resolved') {
+      list = list.filter(c => c.assignedAgentId === state.currentUser?.id && c.status === 'RESOLVED');
+    } else { // 'all'
+      list = list.filter(c => c.status !== 'RESOLVED');
+    }
+  } else {
+    // ADMIN SUPERVISOR ROLE:
+    const adminFilterVal = document.getElementById('admin-agent-filter')?.value || 'ALL';
+    if (adminFilterVal === 'UNASSIGNED') {
+      list = list.filter(c => !c.assignedAgentId && c.status !== 'RESOLVED');
+    } else if (adminFilterVal !== 'ALL') {
+      list = list.filter(c => c.assignedAgentId === adminFilterVal && c.status !== 'RESOLVED');
+    } else {
+      if (activeTabFilter === 'mine') {
+        list = list.filter(c => c.assignedAgentId === state.currentUser?.id && c.status !== 'RESOLVED');
+      } else if (activeTabFilter === 'unassigned') {
+        list = list.filter(c => !c.assignedAgentId && c.status !== 'RESOLVED');
+      } else if (activeTabFilter === 'resolved') {
+        list = list.filter(c => c.status === 'RESOLVED');
+      } else { // 'all'
+        list = list.filter(c => c.status !== 'RESOLVED');
+      }
+    }
   }
 
   if (list.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:#64748b;">Tidak ada percakapan.</div>';
+    container.innerHTML = '<div class="empty-state" style="padding:24px; text-align:center; color:#64748b;">Tidak ada percakapan pada filter ini.</div>';
     return;
   }
 
@@ -516,13 +737,22 @@ function renderConversationList(filter = 'all', searchKeyword = '') {
     const lastMsg = c.messages?.[0]?.text || 'Percakapan baru';
     const contactName = c.contact?.name || c.contact?.phoneNumber || 'Pelanggan';
     const isActive = c.id === state.activeConversationId ? 'active' : '';
-    const agentBadge = c.assignedAgent 
-      ? `<span class="badge-tag agent">${c.assignedAgent.name}</span>`
-      : '<span class="badge-tag">Belum ada CS</span>';
+    const isResolved = c.status === 'RESOLVED';
+
+    let agentBadge = '';
+    if (c.assignedAgent) {
+      agentBadge = `<span class="badge-tag agent" style="background:rgba(56,189,248,0.15); color:#38bdf8;">${c.assignedAgent.name}</span>`;
+    } else {
+      agentBadge = '<span class="badge-tag" style="background:rgba(245,158,11,0.15); color:#f59e0b;">Belum ada CS</span>';
+    }
+
+    const statusBadge = isResolved
+      ? '<span class="badge-tag" style="background:rgba(148,163,184,0.15); color:#94a3b8;">SELESAI</span>'
+      : `<span class="badge-tag">${c.status}</span>`;
 
     return `
       <div class="conv-item ${isActive}" onclick="selectConversation('${c.id}')">
-        <div class="conv-avatar">${contactName.slice(0, 2).toUpperCase()}</div>
+        <div class="conv-avatar" style="${isResolved ? 'filter: grayscale(1); opacity:0.7;' : ''}">${contactName.slice(0, 2).toUpperCase()}</div>
         <div class="conv-details">
           <div class="conv-top-row">
             <span class="conv-name">${contactName}</span>
@@ -531,7 +761,7 @@ function renderConversationList(filter = 'all', searchKeyword = '') {
           <div class="conv-snippet">${lastMsg}</div>
           <div class="conv-meta">
             ${agentBadge}
-            <span class="badge-tag">${c.status}</span>
+            ${statusBadge}
           </div>
         </div>
       </div>
@@ -547,13 +777,54 @@ window.selectConversation = async function(id) {
   if (!conv) return;
 
   const contactName = conv.contact?.name || conv.contact?.phoneNumber || 'Pelanggan';
+  const hasCustomName = Boolean(conv.contact?.name);
+
   document.getElementById('active-chat-title').textContent = contactName;
   document.getElementById('active-chat-subtitle').textContent = `WA: ${conv.contact?.phoneNumber || '-'} | Terhubung ke: ${conv.whatsappAccount?.labelName || 'Akun WA'}`;
   document.getElementById('active-chat-avatar').textContent = contactName.slice(0, 2).toUpperCase();
   document.getElementById('active-chat-status').textContent = conv.status;
 
-  document.getElementById('active-chat-actions').style.display = 'flex';
-  document.getElementById('chat-compose-bar').style.display = 'flex';
+  const actionsBar = document.getElementById('active-chat-actions');
+  const composeBar = document.getElementById('chat-compose-bar');
+  const btnEditName = document.getElementById('btn-edit-contact-name');
+  const btnClose = document.getElementById('btn-close-conversation');
+  const btnReopen = document.getElementById('btn-reopen-conversation');
+  const btnAssign = document.getElementById('btn-assign-me');
+  const selectReassign = document.getElementById('select-reassign-agent');
+
+  actionsBar.style.display = 'flex';
+  btnEditName.style.display = 'inline-block';
+  btnEditName.textContent = hasCustomName ? '✏️ Ubah Nama' : '✏️ Beri Nama';
+
+  if (conv.status === 'RESOLVED') {
+    if (btnClose) btnClose.style.display = 'none';
+    if (btnReopen) btnReopen.style.display = 'inline-block';
+    if (composeBar) composeBar.style.display = 'none';
+    if (btnAssign) btnAssign.style.display = 'none';
+  } else {
+    if (btnClose) btnClose.style.display = 'inline-block';
+    if (btnReopen) btnReopen.style.display = 'none';
+    if (composeBar) composeBar.style.display = 'flex';
+
+    if (conv.assignedAgentId === state.currentUser?.id) {
+      if (btnAssign) btnAssign.style.display = 'none';
+    } else {
+      if (btnAssign) {
+        btnAssign.style.display = 'inline-block';
+        btnAssign.textContent = conv.assignedAgent ? `📌 Ambil Alih (${conv.assignedAgent.name})` : '📌 Ambil Chat Ini';
+      }
+    }
+  }
+
+  // Admin Supervisor Reassign dropdown
+  if (state.currentUser?.role === 'ADMIN') {
+    if (selectReassign) {
+      selectReassign.style.display = 'inline-block';
+      selectReassign.value = conv.assignedAgentId || '';
+    }
+  } else {
+    if (selectReassign) selectReassign.style.display = 'none';
+  }
 
   await loadActiveMessages(id);
 };
@@ -582,8 +853,20 @@ function renderMessagesStream(messages) {
     const rowClass = isOutbound ? 'outbound' : 'inbound';
     const isBot = m.senderType === 'BOT';
     const isSystem = m.senderType === 'SYSTEM';
-    const bubbleClass = isBot ? 'bot-bubble' : '';
-    const staffName = m.agentNameSnapshot || (m.agent ? m.agent.name : (isBot ? 'Bot Otomatis' : (isSystem ? '🚀 Broadcast' : 'CS')));
+    const bubbleClass = isBot ? 'bot-bubble' : (isSystem ? 'system-bubble' : '');
+
+    let staffName = m.agentNameSnapshot;
+    if (!staffName) {
+      if (m.senderType === 'AGENT') {
+        staffName = m.agent ? `🎧 CS ${m.agent.name}` : '🎧 CS';
+      } else if (isBot) {
+        staffName = '🤖 Bot Otomatis';
+      } else if (isSystem) {
+        staffName = '🚀 Broadcast';
+      } else {
+        staffName = 'CS';
+      }
+    }
 
     let statusTick = '';
     if (isOutbound) {
@@ -629,8 +912,8 @@ async function sendReply() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text,
-        agentId: state.currentUser.id,
-        agentNameSnapshot: state.currentUser.name
+        agentId: state.currentUser?.id,
+        agentNameSnapshot: state.currentUser?.name
       })
     });
     const json = await res.json();

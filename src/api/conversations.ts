@@ -4,6 +4,20 @@ import { SessionManager } from '../whatsapp/session-manager';
 
 export const conversationRouter = Router();
 
+// Get list of active agents (for admin dropdown filter and assignment)
+conversationRouter.get('/agents', async (_req: Request, res: Response) => {
+  try {
+    const agents = await prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' }
+    });
+    return res.json({ success: true, data: agents });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // List all conversations
 conversationRouter.get('/', async (req: Request, res: Response) => {
   try {
@@ -62,7 +76,7 @@ conversationRouter.get('/:id', async (req: Request, res: Response) => {
 conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { text, agentId, agentName } = req.body;
+    const { text, agentId, agentName, agentNameSnapshot } = req.body;
 
     if (!text) {
       return res.status(400).json({ error: 'Message text is required' });
@@ -107,16 +121,23 @@ conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
       }
     }
 
-    // 2. Record Message with explicit AGENT ID & Account Name Snapshot
+    // 2. Resolve Agent Name & Record Message
+    const effectiveAgentId = agentId || req.user?.id || null;
+    let resolvedAgentName = req.user?.name || agentNameSnapshot || agentName;
+    if (!resolvedAgentName && effectiveAgentId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: effectiveAgentId }, select: { name: true } });
+      if (dbUser) resolvedAgentName = dbUser.name;
+    }
+
     const account = await prisma.whatsappAccount.findUnique({ where: { id: conversation.whatsappAccountId } });
-    const staffLabel = `${agentName || 'Customer Service'} (${account?.labelName || 'WA'})`;
+    const staffLabel = `🎧 CS ${resolvedAgentName || 'Customer Service'} (${account?.labelName || 'WA'})`;
 
     const message = await prisma.message.create({
       data: {
         conversationId: id,
         direction: 'OUTBOUND',
         senderType: 'AGENT',
-        agentId: agentId || null,
+        agentId: effectiveAgentId,
         agentNameSnapshot: staffLabel,
         text,
         status: 'SENT'
@@ -127,7 +148,7 @@ conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
     await prisma.conversation.update({
       where: { id },
       data: {
-        assignedAgentId: agentId || conversation.assignedAgentId,
+        assignedAgentId: effectiveAgentId || conversation.assignedAgentId,
         status: 'AGENT_ASSIGNED',
         lastMessageAt: new Date()
       }
@@ -139,7 +160,7 @@ conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
   }
 });
 
-// Assign conversation to agent
+// Assign or reassign conversation to agent (or release to unassigned queue)
 conversationRouter.post('/:id/assign', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -148,12 +169,90 @@ conversationRouter.post('/:id/assign', async (req: Request, res: Response) => {
     const updated = await prisma.conversation.update({
       where: { id },
       data: {
-        assignedAgentId: agentId,
-        status: 'AGENT_ASSIGNED'
+        assignedAgentId: agentId || null,
+        status: agentId ? 'AGENT_ASSIGNED' : 'NEEDS_AGENT'
       }
     });
 
     return res.json({ success: true, data: updated });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Close / Resolve conversation
+conversationRouter.post('/:id/close', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const conversation = await prisma.conversation.findUnique({ where: { id } });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    const updated = await prisma.conversation.update({
+      where: { id },
+      data: {
+        status: 'RESOLVED',
+        lastMessageAt: new Date()
+      }
+    });
+
+    const closerName = req.user?.name || 'Customer Service';
+    await prisma.message.create({
+      data: {
+        conversationId: id,
+        direction: 'OUTBOUND',
+        senderType: 'SYSTEM',
+        agentNameSnapshot: `🔒 Sesi Diselesaikan`,
+        text: `Sesi percakapan diselesaikan oleh ${closerName}.`,
+        status: 'SENT'
+      }
+    });
+
+    return res.json({ success: true, data: updated });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Reopen a resolved conversation
+conversationRouter.post('/:id/reopen', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updated = await prisma.conversation.update({
+      where: { id },
+      data: {
+        status: 'NEEDS_AGENT',
+        lastMessageAt: new Date()
+      }
+    });
+
+    return res.json({ success: true, data: updated });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Rename / update contact name for this conversation
+conversationRouter.patch('/:id/contact', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({ error: 'Nama kontak tidak boleh kosong.' });
+    }
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id },
+      select: { contactId: true }
+    });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    const updatedContact = await prisma.contact.update({
+      where: { id: conversation.contactId },
+      data: { name: name.trim() }
+    });
+
+    return res.json({ success: true, contact: updatedContact });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }
