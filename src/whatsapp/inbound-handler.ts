@@ -3,7 +3,7 @@ import { formatE164 } from '../utils/phone';
 import { matchBotRuleLocal } from '../bot/rule-engine';
 import { SessionManager } from './session-manager';
 
-export async function handleInboundMessage(accountId: string, senderJid: string, text: string): Promise<void> {
+export async function handleInboundMessage(accountId: string, senderJid: string, text: string, senderName?: string): Promise<{ conversationId?: string }> {
   const { cleanNumber } = formatE164(senderJid);
 
   // Check Opt-Out STOP keyword
@@ -16,17 +16,17 @@ export async function handleInboundMessage(accountId: string, senderJid: string,
     try {
       await SessionManager.sendMessage(accountId, senderJid, 'Anda telah berhenti berlangganan. Nomor Anda tidak akan menerima pesan promo lagi.');
     } catch (_) {}
-    return;
+    return {};
   }
 
-  // Find or create Contact
+  // Find or create Contact (save senderName if provided)
   const contact = await prisma.contact.upsert({
     where: { phoneNumber: cleanNumber },
-    create: { phoneNumber: cleanNumber },
-    update: {}
+    create: { phoneNumber: cleanNumber, name: senderName || null },
+    update: { name: senderName || undefined }
   });
 
-  if (contact.isBlacklisted) return;
+  if (contact.isBlacklisted) return {};
 
   // Find or create Conversation
   let conversation = await prisma.conversation.findUnique({
@@ -45,6 +45,11 @@ export async function handleInboundMessage(accountId: string, senderJid: string,
         contactId: contact.id,
         status: 'BOT_ACTIVE'
       }
+    });
+  } else {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() }
     });
   }
 
@@ -85,6 +90,52 @@ export async function handleInboundMessage(accountId: string, senderJid: string,
       });
     }
   }
+
+  return { conversationId: conversation.id };
+}
+
+export async function handleOutboundFromPhone(accountId: string, remoteJid: string, text: string): Promise<{ conversationId?: string }> {
+  const { cleanNumber } = formatE164(remoteJid);
+  const contact = await prisma.contact.upsert({
+    where: { phoneNumber: cleanNumber },
+    create: { phoneNumber: cleanNumber },
+    update: {}
+  });
+
+  let conversation = await prisma.conversation.findUnique({
+    where: {
+      whatsappAccountId_contactId: {
+        whatsappAccountId: accountId,
+        contactId: contact.id
+      }
+    }
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: {
+        whatsappAccountId: accountId,
+        contactId: contact.id,
+        status: 'NEEDS_AGENT'
+      }
+    });
+  } else {
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() }
+    });
+  }
+
+  await prisma.message.create({
+    data: {
+      conversationId: conversation.id,
+      direction: 'OUTBOUND',
+      senderType: 'AGENT',
+      agentNameSnapshot: 'HP WhatsApp',
+      text,
+      status: 'SENT'
+    }
+  });
 
   return { conversationId: conversation.id };
 }

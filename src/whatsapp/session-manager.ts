@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
 import { prisma } from '../database/client';
 import { sleep } from '../utils/delay';
 import EventEmitter from 'events';
+import { handleInboundMessage, handleOutboundFromPhone } from './inbound-handler';
 
 export const sessionEvents = new EventEmitter();
 
@@ -107,23 +108,30 @@ export class SessionManager {
       }
     });
 
-    // 1. Listen for Incoming Messages & Trigger Bot / Inbox
+    // 1. Listen for Incoming & Outgoing Messages & Sync to Live Inbox
     socket.ev.on('messages.upsert', async (m) => {
       try {
         if (m.type !== 'notify') return;
         for (const msg of m.messages) {
-          if (!msg.message || msg.key.fromMe) continue;
-          const senderJid = msg.key.remoteJid;
-          if (!senderJid || senderJid.endsWith('@g.us')) continue; // Skip groups
+          if (!msg.message) continue;
+          const remoteJid = msg.key.remoteJid;
+          if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid.includes('status@broadcast')) continue;
 
           const text = msg.message.conversation ||
                        msg.message.extendedTextMessage?.text ||
                        msg.message.imageMessage?.caption || '';
 
-          if (text) {
-            console.log(`📩 [Pesan Masuk] dari ${senderJid} pada akun ${accountId}: "${text}"`);
-            const result = await handleInboundMessage(accountId, senderJid, text);
-            sessionEvents.emit('message:inbound', { accountId, senderJid, text, conversationId: result?.conversationId });
+          if (!text) continue;
+
+          if (msg.key.fromMe) {
+            console.log(`📤 [Pesan Terkirim dari HP] ke ${remoteJid}: "${text}"`);
+            const result = await handleOutboundFromPhone(accountId, remoteJid, text);
+            sessionEvents.emit('message:inbound', { accountId, senderJid: remoteJid, text, conversationId: result?.conversationId });
+          } else {
+            const pushName = msg.pushName || null;
+            console.log(`📩 [Pesan Masuk] dari ${remoteJid} (${pushName || 'Anonim'}): "${text}"`);
+            const result = await handleInboundMessage(accountId, remoteJid, text, pushName || undefined);
+            sessionEvents.emit('message:inbound', { accountId, senderJid: remoteJid, text, conversationId: result?.conversationId });
           }
         }
       } catch (err: any) {
