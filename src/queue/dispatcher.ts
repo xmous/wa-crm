@@ -63,24 +63,52 @@ export class QueueDispatcher {
       const toJid = `${job.recipientPhone}@s.whatsapp.net`;
       await SessionManager.simulateTyping(accountId, toJid, 2000);
 
-      // 2. Dispatch Message
-      await SessionManager.sendMessage(accountId, toJid, job.renderedText);
+      // 2. Dispatch Message with failure protection
+      try {
+        await SessionManager.sendMessage(accountId, toJid, job.renderedText);
 
-      // 3. Update Database records
-      await prisma.$transaction([
-        prisma.broadcastQueue.update({
-          where: { id: job.id },
-          data: { status: 'SENT', sentAt: new Date() }
-        }),
-        prisma.whatsappAccount.update({
-          where: { id: accountId },
-          data: { sentToday: { increment: 1 } }
-        }),
-        prisma.broadcastCampaign.update({
-          where: { id: job.campaignId },
-          data: { sentCount: { increment: 1 } }
-        })
-      ]);
+        // 3. Update Database records on success
+        const [_, __, updatedCampaign] = await prisma.$transaction([
+          prisma.broadcastQueue.update({
+            where: { id: job.id },
+            data: { status: 'SENT', sentAt: new Date() }
+          }),
+          prisma.whatsappAccount.update({
+            where: { id: accountId },
+            data: { sentToday: { increment: 1 } }
+          }),
+          prisma.broadcastCampaign.update({
+            where: { id: job.campaignId },
+            data: { sentCount: { increment: 1 } }
+          })
+        ]);
+
+        if (updatedCampaign.sentCount + updatedCampaign.failedCount >= updatedCampaign.totalTargets) {
+          await prisma.broadcastCampaign.update({
+            where: { id: job.campaignId },
+            data: { status: 'COMPLETED' }
+          });
+        }
+      } catch (sendErr: any) {
+        console.error(`Failed to send broadcast to ${job.recipientPhone}:`, sendErr.message);
+        const [_, updatedCampaign] = await prisma.$transaction([
+          prisma.broadcastQueue.update({
+            where: { id: job.id },
+            data: { status: 'FAILED', failureReason: sendErr.message || 'Send error' }
+          }),
+          prisma.broadcastCampaign.update({
+            where: { id: job.campaignId },
+            data: { failedCount: { increment: 1 } }
+          })
+        ]);
+
+        if (updatedCampaign.sentCount + updatedCampaign.failedCount >= updatedCampaign.totalTargets) {
+          await prisma.broadcastCampaign.update({
+            where: { id: job.campaignId },
+            data: { status: 'COMPLETED' }
+          });
+        }
+      }
 
       this.consecutiveSent++;
 

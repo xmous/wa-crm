@@ -27,13 +27,25 @@ const PRESET_TEMPLATES = {
 
 // Spintax Resolver Utility for Preview
 function resolveSpintax(text) {
-  const spintaxRegex = /\{([^{}]+)\}/;
-  let matches;
-  let resolved = text;
-  while ((matches = spintaxRegex.exec(resolved)) !== null) {
-    const options = matches[1].split('|');
-    const randomOption = options[Math.floor(Math.random() * options.length)];
-    resolved = resolved.replace(matches[0], randomOption);
+  if (!text) return '';
+  // Support both (opt1|opt2) and {opt1|opt2}
+  let resolved = text.replace(/\(([^()]+)\)/g, (match, inner) => {
+    return inner.includes('|') ? `{${inner}}` : match;
+  });
+
+  const spintaxRegex = /\{([^{}]+)\}/g;
+  let maxIterations = 20;
+  while (maxIterations-- > 0) {
+    let changed = false;
+    resolved = resolved.replace(spintaxRegex, (match, inner) => {
+      if (inner.includes('|')) {
+        changed = true;
+        const options = inner.split('|');
+        return options[Math.floor(Math.random() * options.length)];
+      }
+      return match; // Keep variables like {nama}, {name} untouched
+    });
+    if (!changed) break;
   }
   return resolved;
 }
@@ -905,9 +917,26 @@ async function updateContactsCountBadge() {
     const res = await fetch('/api/contacts');
     const json = await res.json();
     if (json.success) {
-      const activeContacts = json.contacts.filter(c => !c.isBlacklisted);
+      const activeContacts = json.contacts.filter(c => !c.isBlacklisted && !c.phoneNumber.startsWith('25445') && c.phoneNumber.length >= 10);
       const badge = document.getElementById('count-available-contacts');
       if (badge) badge.textContent = `${activeContacts.length} nomor aktif`;
+
+      // Dynamically populate mockup test name options with real contacts from DB
+      const nameSelect = document.getElementById('mockup-name-select');
+      if (nameSelect) {
+        const namesWithReal = activeContacts.filter(c => c.name && c.name.trim()).map(c => c.name.trim());
+        const uniqueNames = Array.from(new Set(namesWithReal));
+        if (uniqueNames.length > 0) {
+          const currentVal = nameSelect.value;
+          nameSelect.innerHTML = uniqueNames.map(n => `<option value="${n}">${n}</option>`).join('');
+          if (uniqueNames.includes(currentVal)) {
+            nameSelect.value = currentVal;
+          }
+          const targetNameEl = document.getElementById('mockup-target-name');
+          if (targetNameEl) targetNameEl.textContent = nameSelect.value;
+          updateMockupPreview();
+        }
+      }
     }
   } catch (_) {}
 }
@@ -1168,16 +1197,20 @@ function initBroadcast() {
     });
   });
 
-  // Fill Phone Contacts automatically
+  // Fill Phone Contacts automatically (with names)
   if (fillContactsBtn) {
     fillContactsBtn.addEventListener('click', async () => {
       try {
         const res = await fetch('/api/contacts?filter=active');
         const json = await res.json();
-        if (json.success && json.contacts.length > 0) {
-          const phones = json.contacts.map(c => c.phoneNumber).join('\n');
-          document.getElementById('campaign-recipients').value = phones;
-          showToast(`Berhasil memasukkan ${json.contacts.length} nomor aktif dari buku kontak`, 'success');
+        if (json.success && json.contacts && json.contacts.length > 0) {
+          const validContacts = json.contacts.filter(c => !c.phoneNumber.startsWith('25445') && c.phoneNumber.length >= 10);
+          const lines = validContacts.map(c => {
+            return c.name ? `${c.phoneNumber}, ${c.name}` : c.phoneNumber;
+          });
+          const textarea = document.getElementById('campaign-recipients');
+          textarea.value = lines.join('\n');
+          showToast(`✅ Berhasil memasukkan ${lines.length} kontak dengan nama ke daftar penerima!`, 'success');
         } else {
           showToast('Belum ada kontak aktif. Tarik kontak dari WhatsApp HP terlebih dahulu.', 'warning');
         }
@@ -1187,7 +1220,7 @@ function initBroadcast() {
     });
   }
 
-  // Upload CSV / TXT to fill recipients
+  // Upload CSV / TXT to fill recipients (extracts phone & name)
   const uploadRecipientsBtn = document.getElementById('btn-upload-recipients-file');
   const broadcastFileInput = document.getElementById('broadcast-file-input');
 
@@ -1199,13 +1232,25 @@ function initBroadcast() {
       const reader = new FileReader();
       reader.onload = (evt) => {
         const text = (evt.target && evt.target.result) || '';
-        const matches = text.match(/(?:\+?62|0)[0-9]{8,14}/g);
-        if (matches && matches.length > 0) {
-          const unique = Array.from(new Set(matches.map(m => m.trim())));
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const parsed = [];
+        for (const line of lines) {
+          const match = line.match(/(?:\+?62|0)[0-9]{8,14}/);
+          if (match) {
+            const phone = match[0];
+            const remaining = line.replace(phone, '').replace(/^[,;\s-]+|[,;\s-]+$/g, '').trim();
+            if (remaining) {
+              parsed.push(`${phone}, ${remaining}`);
+            } else {
+              parsed.push(phone);
+            }
+          }
+        }
+        if (parsed.length > 0) {
           const textarea = document.getElementById('campaign-recipients');
           const existing = textarea.value.trim();
-          textarea.value = existing ? `${existing}\n${unique.join('\n')}` : unique.join('\n');
-          showToast(`✅ Berhasil mengekstrak ${unique.length} nomor dari file!`, 'success');
+          textarea.value = existing ? `${existing}\n${parsed.join('\n')}` : parsed.join('\n');
+          showToast(`✅ Berhasil mengekstrak ${parsed.length} nomor & nama dari file!`, 'success');
         } else {
           showToast('Tidak ditemukan format nomor telepon valid dalam file', 'warning');
         }
