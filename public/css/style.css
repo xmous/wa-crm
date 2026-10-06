@@ -168,8 +168,7 @@ body {
   border-radius: 10px;
 }
 
-.nav-tab-btn .badge:empty,
-.nav-tab-btn .badge:contains("0") {
+.nav-tab-btn .badge:empty {
   display: none;
 }
 

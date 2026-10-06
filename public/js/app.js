@@ -685,13 +685,13 @@ function initContacts() {
   if (importBtn && importInput) {
     importBtn.addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = async (evt) => {
-        const text = evt.target?.result as string || '';
+        const text = (evt.target && evt.target.result) || '';
         const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        const contacts: Array<{ phoneNumber: string, name?: string }> = [];
+        const contacts = [];
 
         for (const line of lines) {
           // Check comma, semicolon, tab
@@ -729,7 +729,7 @@ function initContacts() {
           } else {
             showToast(json.error || 'Gagal mengimpor kontak', 'error');
           }
-        } catch (err: any) {
+        } catch (err) {
           showToast('Gagal impor: ' + err.message, 'error');
         }
       };
@@ -1096,7 +1096,7 @@ window.toggleBotRuleActive = async function(id, nextActive) {
     } else {
       showToast(json.error || 'Gagal mengubah status aturan', 'error');
     }
-  } catch (err: any) {
+  } catch (err) {
     showToast('Gagal: ' + err.message, 'error');
   }
 };
@@ -1194,15 +1194,15 @@ function initBroadcast() {
   if (uploadRecipientsBtn && broadcastFileInput) {
     uploadRecipientsBtn.addEventListener('click', () => broadcastFileInput.click());
     broadcastFileInput.addEventListener('change', (e) => {
-      const file = (e.target as any).files?.[0];
+      const file = e.target.files && e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (evt) => {
-        const text = (evt.target?.result as string) || '';
+        const text = (evt.target && evt.target.result) || '';
         const matches = text.match(/(?:\+?62|0)[0-9]{8,14}/g);
         if (matches && matches.length > 0) {
           const unique = Array.from(new Set(matches.map(m => m.trim())));
-          const textarea = document.getElementById('campaign-recipients') as HTMLTextAreaElement;
+          const textarea = document.getElementById('campaign-recipients');
           const existing = textarea.value.trim();
           textarea.value = existing ? `${existing}\n${unique.join('\n')}` : unique.join('\n');
           showToast(`✅ Berhasil mengekstrak ${unique.length} nomor dari file!`, 'success');
@@ -1211,7 +1211,7 @@ function initBroadcast() {
         }
       };
       reader.readAsText(file);
-      (broadcastFileInput as any).value = '';
+      broadcastFileInput.value = '';
     });
   }
 
