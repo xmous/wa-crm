@@ -85,4 +85,6 @@ export async function handleInboundMessage(accountId: string, senderJid: string,
       });
     }
   }
+
+  return { conversationId: conversation.id };
 }

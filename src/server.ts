@@ -31,6 +31,8 @@ export function createServer() {
   sessionEvents.on('qr', (data) => io.emit('wa:qr', data));
   sessionEvents.on('connected', (data) => io.emit('wa:connected', data));
   sessionEvents.on('banned', (data) => io.emit('wa:banned', data));
+  sessionEvents.on('message:inbound', (data) => io.emit('chat:inbound', data));
+  sessionEvents.on('contacts:synced', (data) => io.emit('contacts:synced', data));
 
   io.on('connection', (socket) => {
     // Client connected to realtime dashboard
