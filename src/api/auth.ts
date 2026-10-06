@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../database/client';
 import { config } from '../config';
+import { requireAuth } from '../middleware/auth';
 
 export const authRouter = Router();
 
@@ -67,5 +68,20 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+authRouter.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, name: true, email: true, role: true, isActive: true }
+    });
+    if (!user || !user.isActive) {
+      return res.status(401).json({ success: false, error: 'Pengguna tidak aktif atau tidak ditemukan.' });
+    }
+    return res.json({ success: true, user });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
