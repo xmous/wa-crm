@@ -6,296 +6,529 @@
   <title>WA-CRM | Otomasi WhatsApp Multi-Akun & Anti-Ban</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="dark-theme">
-  <div class="app-wrapper">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <div class="brand-logo">
-          <div class="logo-icon">WA</div>
-          <div class="logo-text">
-            <h2>WA-CRM<span>.PRO</span></h2>
-            <p>Multi-Agent & Anti-Ban</p>
+  <!-- Top Navigation Bar Layout -->
+  <header class="top-navbar">
+    <div class="nav-left">
+      <div class="brand-logo">
+        <div class="logo-icon">WA</div>
+        <div class="brand-text">
+          <div class="brand-name">WA-CRM<span class="brand-tag">PRO</span></div>
+          <div class="brand-sub"><span class="dot green"></span> Engine Aktif</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Navigation Tabs -->
+    <nav class="nav-tabs" id="main-nav-tabs">
+      <button class="nav-tab-btn active" data-tab="inbox" id="tab-btn-inbox">
+        <span class="tab-icon">💬</span>
+        <span class="tab-label">Live Inbox</span>
+        <span class="badge" id="badge-unread">0</span>
+      </button>
+      <button class="nav-tab-btn" data-tab="accounts" id="tab-btn-accounts">
+        <span class="tab-icon">📱</span>
+        <span class="tab-label">Akun WA</span>
+        <span class="status-dot-pulse" id="dot-connected"></span>
+      </button>
+      <button class="nav-tab-btn" data-tab="contacts" id="tab-btn-contacts">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">Buku Kontak</span>
+      </button>
+      <button class="nav-tab-btn" data-tab="bot-rules" id="tab-btn-bot-rules">
+        <span class="tab-icon">🤖</span>
+        <span class="tab-label">Aturan Bot</span>
+      </button>
+      <button class="nav-tab-btn" data-tab="broadcast" id="tab-btn-broadcast">
+        <span class="tab-icon">🚀</span>
+        <span class="tab-label">Broadcast</span>
+      </button>
+      <button class="nav-tab-btn" data-tab="reports" id="tab-btn-reports">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Laporan</span>
+      </button>
+    </nav>
+
+    <!-- Right User Profile & Switcher -->
+    <div class="nav-right">
+      <div class="quick-kpi-pill">
+        <span class="kpi-label">Kirim Hari Ini:</span>
+        <span class="kpi-val" id="top-sent-count">0</span>
+      </div>
+      <div class="user-profile-widget" id="user-profile-widget">
+        <div class="user-avatar" id="current-agent-avatar">AD</div>
+        <div class="user-details">
+          <span class="user-name" id="current-agent-name">Admin Utama</span>
+          <span class="user-role-badge" id="current-agent-role">ADMIN</span>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline" id="btn-switch-account" title="Ganti Pengguna / Logout">
+        <span>🔄 Ganti Akun</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Area -->
+  <main class="main-workspace">
+    <!-- View 1: Live Inbox (Multi-Agent CS) -->
+    <section id="view-inbox" class="tab-view active">
+      <div class="inbox-layout">
+        <!-- Conversation List -->
+        <div class="inbox-list-pane">
+          <div class="inbox-search-box">
+            <input type="text" id="chat-search" placeholder="🔍 Cari nomor atau nama pelanggan...">
+          </div>
+          <div class="inbox-filter-tabs">
+            <button class="filter-tab active" data-filter="all">Semua</button>
+            <button class="filter-tab" data-filter="unassigned">Belum Ada CS</button>
+            <button class="filter-tab" data-filter="mine">Chat Saya</button>
+          </div>
+          <div class="conversations-scroll" id="conversations-container">
+            <div class="empty-state">Memuat percakapan...</div>
+          </div>
+        </div>
+
+        <!-- Chat Window -->
+        <div class="chat-window-pane">
+          <div class="chat-header" id="active-chat-header">
+            <div class="chat-header-user">
+              <div class="avatar" id="active-chat-avatar">?</div>
+              <div>
+                <h3 id="active-chat-title">Pilih percakapan di sebelah kiri</h3>
+                <p id="active-chat-subtitle">-</p>
+              </div>
+            </div>
+            <div class="chat-header-actions" id="active-chat-actions" style="display:none;">
+              <button class="btn btn-sm btn-outline" id="btn-assign-me">📌 Ambil Chat Ini</button>
+              <span class="badge-status" id="active-chat-status">BOT_ACTIVE</span>
+            </div>
+          </div>
+
+          <div class="messages-stream" id="messages-stream">
+            <div class="chat-placeholder">
+              <div class="icon">💬</div>
+              <h3>Pilih percakapan untuk melihat obrolan langsung</h3>
+              <p>Setiap balasan yang dikirim staf CS terekam nama pengirim dan stempel waktunya.</p>
+            </div>
+          </div>
+
+          <div class="chat-compose-bar" id="chat-compose-bar" style="display:none;">
+            <input type="text" id="reply-message-input" placeholder="Ketik balasan CS... (tekan Enter untuk kirim)">
+            <button class="btn btn-primary" id="btn-send-reply">
+              <span>Kirim Pesan</span>
+              <span class="sub-text" id="send-as-label">sebagai CS</span>
+            </button>
           </div>
         </div>
       </div>
+    </section>
 
-      <nav class="sidebar-nav">
-        <button class="nav-btn active" data-tab="inbox" id="tab-btn-inbox">
-          <span class="icon">💬</span>
-          <span class="label">Live Inbox CS</span>
-          <span class="badge" id="badge-unread">0</span>
-        </button>
-        <button class="nav-btn" data-tab="accounts" id="tab-btn-accounts">
-          <span class="icon">📱</span>
-          <span class="label">Akun WhatsApp</span>
-          <span class="status-dot-pulse" id="dot-connected"></span>
-        </button>
-        <button class="nav-btn" data-tab="broadcast" id="tab-btn-broadcast">
-          <span class="icon">🚀</span>
-          <span class="label">Broadcast & Anti-Ban</span>
-        </button>
-        <button class="nav-btn" data-tab="reports" id="tab-btn-reports">
-          <span class="icon">📊</span>
-          <span class="label">Laporan & Audit CS</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <div class="agent-profile">
-          <div class="agent-avatar" id="current-agent-avatar">CS</div>
-          <div class="agent-info">
-            <span class="agent-name" id="current-agent-name">Siti Nurhaliza</span>
-            <span class="agent-role">Customer Service #1</span>
+    <!-- View 2: WhatsApp Accounts -->
+    <section id="view-accounts" class="tab-view">
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>📱 Manajemen Akun WhatsApp (Multi-Device)</h2>
+            <p>Kelola banyak nomor WhatsApp. Setiap nomor memiliki kuota harian aman dan sesi tersimpan di database.</p>
           </div>
+          <button class="btn btn-primary" id="btn-open-add-account">+ Tambah Nomor Baru</button>
         </div>
-        <div class="agent-selector-wrapper">
-          <label for="agent-switch">Login sebagai:</label>
-          <select id="agent-switch" class="styled-select">
-            <option value="cs-1|Siti Nurhaliza">Siti Nurhaliza (CS-1)</option>
-            <option value="cs-2|Budi Santoso">Budi Santoso (CS-2)</option>
-            <option value="admin|Admin Utama">Admin Utama</option>
-          </select>
+
+        <div class="accounts-grid" id="accounts-grid">
+          <!-- Account cards injected via JS -->
         </div>
       </div>
-    </aside>
+    </section>
 
-    <!-- Main Content Area -->
-    <main class="main-content">
-      <!-- Top Bar -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <h1 id="page-title">Live Chat Inbox Multi-Agent</h1>
-          <span class="system-status-pill" id="system-status-indicator">
-            <span class="dot green"></span> Engine Aktif
-          </span>
-        </div>
-        <div class="topbar-right">
-          <div class="quick-metric">
-            <span class="metric-label">Terkirim Hari Ini:</span>
-            <span class="metric-val" id="top-sent-count">0</span>
+    <!-- View 3: Buku Kontak Pelanggan & WA HP Sync -->
+    <section id="view-contacts" class="tab-view">
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>👥 Buku Kontak & Sinkronisasi WA HP</h2>
+            <p>Database kontak pelanggan dari chat masuk dan buku kontak WhatsApp HP yang terhubung.</p>
           </div>
-          <div class="quick-metric">
-            <span class="metric-label">Akun Online:</span>
-            <span class="metric-val highlight" id="top-online-count">0</span>
+          <div class="header-actions">
+            <button class="btn btn-success" id="btn-sync-phone-contacts">🔄 Tarik Kontak dari WhatsApp HP</button>
+            <button class="btn btn-primary" id="btn-open-add-contact">+ Tambah Kontak Manual</button>
           </div>
         </div>
-      </header>
 
-      <!-- View 1: Live Inbox (Multi-Agent CS) -->
-      <section id="view-inbox" class="tab-view active">
-        <div class="inbox-layout">
-          <!-- Conversation List -->
-          <div class="inbox-list-pane">
-            <div class="inbox-search-box">
-              <input type="text" id="chat-search" placeholder="Cari nomor atau nama...">
-            </div>
-            <div class="inbox-filter-tabs">
-              <button class="filter-tab active" data-filter="all">Semua</button>
-              <button class="filter-tab" data-filter="unassigned">Belum Ada CS</button>
-              <button class="filter-tab" data-filter="mine">Chat Saya</button>
-            </div>
-            <div class="conversations-scroll" id="conversations-container">
-              <div class="empty-state">Memuat percakapan...</div>
-            </div>
+        <div class="contacts-toolbar">
+          <div class="search-input-wrapper">
+            <input type="text" id="contacts-search" placeholder="🔍 Cari nama atau nomor telepon...">
           </div>
-
-          <!-- Chat Window -->
-          <div class="chat-window-pane">
-            <div class="chat-header" id="active-chat-header">
-              <div class="chat-header-user">
-                <div class="avatar" id="active-chat-avatar">?</div>
-                <div>
-                  <h3 id="active-chat-title">Pilih salah satu percakapan di sebelah kiri</h3>
-                  <p id="active-chat-subtitle">-</p>
-                </div>
-              </div>
-              <div class="chat-header-actions" id="active-chat-actions" style="display:none;">
-                <button class="btn btn-sm btn-outline" id="btn-assign-me">📌 Ambil Chat Ini</button>
-                <span class="badge-status" id="active-chat-status">BOT_ACTIVE</span>
-              </div>
-            </div>
-
-            <div class="messages-stream" id="messages-stream">
-              <div class="chat-placeholder">
-                <div class="icon">💬</div>
-                <h3>Pilih percakapan untuk melihat riwayat obrolan</h3>
-                <p>Semua balasan yang dikirim staf CS akan terekam nama dan waktu pengirimannya.</p>
-              </div>
-            </div>
-
-            <div class="chat-compose-bar" id="chat-compose-bar" style="display:none;">
-              <input type="text" id="reply-message-input" placeholder="Ketik balasan CS... (tekan Enter untuk kirim)">
-              <button class="btn btn-primary" id="btn-send-reply">
-                <span>Kirim Pesan</span>
-                <span class="sub-text" id="send-as-label">sebagai Siti</span>
-              </button>
-            </div>
+          <div class="filter-pills" id="contacts-filter-group">
+            <button class="filter-pill active" data-filter="all">Semua Kontak</button>
+            <button class="filter-pill" data-filter="active">Aktif</button>
+            <button class="filter-pill" data-filter="blacklisted">Blacklist (STOP)</button>
           </div>
         </div>
-      </section>
 
-      <!-- View 2: WhatsApp Accounts -->
-      <section id="view-accounts" class="tab-view">
-        <div class="section-card">
+        <div class="table-responsive">
+          <table class="styled-table" id="contacts-table">
+            <thead>
+              <tr>
+                <th>Nomor WhatsApp</th>
+                <th>Nama Kontak</th>
+                <th>Status</th>
+                <th>Terakhir Aktif</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="contacts-tbody">
+              <tr><td colspan="5" class="text-center">Memuat daftar kontak...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 4: Aturan Bot & Simulator Sandbox -->
+    <section id="view-bot-rules" class="tab-view">
+      <div class="bot-rules-layout">
+        <!-- Left: Bot Rules List -->
+        <div class="section-card rules-card">
           <div class="section-header">
             <div>
-              <h2>Manajemen Akun WhatsApp (Multi-Session)</h2>
-              <p>Kelola banyak nomor WhatsApp. Setiap nomor memiliki kuota harian aman dan login tersimpan di PostgreSQL.</p>
+              <h2>🤖 Aturan Balasan Otomatis Bot</h2>
+              <p>Bot otomatis membalas keyword, menu nomor, atau mengalihkan chat ke CS manusia.</p>
             </div>
-            <button class="btn btn-primary" id="btn-open-add-account">+ Tambah Nomor Baru</button>
+            <button class="btn btn-primary" id="btn-open-add-rule">+ Tambah Aturan Baru</button>
           </div>
 
-          <div class="accounts-grid" id="accounts-grid">
-            <!-- Account cards injected via JS -->
+          <div class="table-responsive">
+            <table class="styled-table" id="bot-rules-table">
+              <thead>
+                <tr>
+                  <th>Prioritas</th>
+                  <th>Pemicu</th>
+                  <th>Kata Kunci</th>
+                  <th>Teks Balasan</th>
+                  <th>Aksi</th>
+                  <th>Status</th>
+                  <th>Opsi</th>
+                </tr>
+              </thead>
+              <tbody id="bot-rules-tbody">
+                <tr><td colspan="7" class="text-center">Memuat aturan bot...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </section>
 
-      <!-- View 3: Broadcast & Anti-Ban -->
-      <section id="view-broadcast" class="tab-view">
-        <div class="broadcast-layout">
-          <div class="section-card form-card">
-            <h2>Kirim Broadcast Baru</h2>
-            <p>Dilengkapi mesin Spintax acak, simulasi pengetikan manusia, dan jeda acak 8–22 detik.</p>
+        <!-- Right: Interactive Sandbox Simulator -->
+        <div class="section-card sandbox-card">
+          <div class="section-header">
+            <div>
+              <h2>🧪 Simulator Uji Coba Bot</h2>
+              <p>Ketik pesan seperti pelanggan untuk menguji respons aturan bot secara langsung tanpa kirim WA asli.</p>
+            </div>
+          </div>
 
-            <form id="broadcast-form">
-              <div class="form-group">
-                <label for="campaign-title">Judul Kampanye:</label>
-                <input type="text" id="campaign-title" required placeholder="Contoh: Promo Gajian Oktober">
+          <div class="sandbox-simulator-box">
+            <div class="sandbox-chat-area" id="sandbox-chat-stream">
+              <div class="sandbox-msg bot">
+                <div class="msg-bubble">
+                  Halo! Saya simulator bot WA-CRM. Ketik pesan di bawah ini untuk menguji aturan balasan otomatis.
+                </div>
               </div>
+            </div>
 
-              <div class="form-group">
-                <label for="campaign-recipients">Daftar Nomor Penerima (Satu nomor per baris):</label>
-                <textarea id="campaign-recipients" rows="4" required placeholder="081234567890&#10;089876543210&#10;6285712345678"></textarea>
-                <small class="hint">Format nomor otomatis dinormalisasi ke format WhatsApp internasional.</small>
+            <div class="sandbox-input-row">
+              <input type="text" id="sandbox-input" placeholder="Cth: halo, harga, bantuan cs, 1...">
+              <button class="btn btn-primary" id="btn-test-sandbox">⚡ Uji Coba</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 5: Broadcast & Anti-Ban (With WhatsApp Phone Mockup) -->
+    <section id="view-broadcast" class="tab-view">
+      <div class="broadcast-layout-grid">
+        <!-- Left Column: Smart Campaign Composer -->
+        <div class="section-card broadcast-composer-card">
+          <div class="section-header">
+            <div>
+              <h2>🚀 Buat Broadcast Kampanye Baru</h2>
+              <p>Dilengkapi Smart Chips 1-klik, Template Preset, dan jeda humanis 8–22 detik.</p>
+            </div>
+          </div>
+
+          <form id="broadcast-form">
+            <div class="form-group">
+              <label for="campaign-title">Judul Kampanye:</label>
+              <input type="text" id="campaign-title" required placeholder="Contoh: Promo Spesial Gajian Oktober">
+            </div>
+
+            <div class="form-group">
+              <div class="label-row">
+                <label for="campaign-recipients">Daftar Nomor Penerima:</label>
+                <button type="button" class="btn-text highlight" id="btn-fill-phone-contacts">
+                  📋 Isi Otomatis dari Kontak WA HP (<span id="count-available-contacts">0</span>)
+                </button>
               </div>
+              <textarea id="campaign-recipients" rows="4" required placeholder="081234567890&#10;089876543210&#10;6285712345678"></textarea>
+              <small class="hint">Format nomor otomatis dinormalisasi. Nomor yang STOP otomatis diabaikan.</small>
+            </div>
 
-              <div class="form-group">
-                <label for="campaign-template">Template Pesan (Mendukung Spintax):</label>
-                <textarea id="campaign-template" rows="5" required placeholder="{Halo|Hai|Selamat {pagi|siang}} {Kak|Bapak|Ibu}, kami ingin menginfokan promo terbaru kami...&#10;&#10;Ketik STOP jika tidak ingin menerima pesan ini."></textarea>
-                <div class="spintax-preview-box">
-                  <div class="preview-header">
-                    <span>⚡ Preview Variasi Pesan Acak:</span>
-                    <button type="button" class="btn-text" id="btn-test-spintax">Acak Ulang</button>
-                  </div>
-                  <div class="preview-body" id="spintax-preview-output">Ketik template spintax di atas untuk melihat simulasi hasil variasi...</div>
+            <!-- Preset Templates Dropdown -->
+            <div class="form-group">
+              <label for="template-preset-select">Pilih Contoh Template Cepat:</label>
+              <select id="template-preset-select" class="styled-select">
+                <option value="">-- Pilih Template Siap Pakai --</option>
+                <option value="promo">🎉 Promo Diskon Gajian & Voucher</option>
+                <option value="reminder">⏰ Pengingat Tagihan & Jadwal</option>
+                <option value="followup">🤝 Follow Up Prospek Pelanggan</option>
+                <option value="service">🛠️ Notifikasi Pembaruan Layanan</option>
+              </select>
+            </div>
+
+            <!-- Smart Chips Toolbar -->
+            <div class="smart-chips-wrapper">
+              <span class="chips-label">⚡ 1-Klik Sisipkan Variabel:</span>
+              <div class="smart-chips-buttons">
+                <button type="button" class="smart-chip" data-insert="{nama}">+ Nama ({nama})</button>
+                <button type="button" class="smart-chip" data-insert="{Halo|Hai|Selamat {pagi|siang}}">+ Salam Acak</button>
+                <button type="button" class="smart-chip" data-insert="{Kak|Bapak|Ibu}">+ Sapaan Acak</button>
+                <button type="button" class="smart-chip" data-insert="&#10;&#10;Ketik STOP jika tidak ingin menerima pesan ini.">+ Klausa STOP</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="campaign-template">Template Pesan (Mendukung Spintax Acak):</label>
+              <textarea id="campaign-template" rows="5" required placeholder="{Halo|Hai} {Kak|Bapak|Ibu} {nama}, kami ingin menginfokan penawaran menarik hari ini...&#10;&#10;Ketik STOP jika tidak ingin menerima pesan ini."></textarea>
+            </div>
+
+            <div class="anti-ban-checklist">
+              <h4>🛡️ Sistem Proteksi Anti-Banned Aktif:</h4>
+              <ul>
+                <li>✅ Jeda Acak Manusiawi (8 s/d 22 detik antar nomor)</li>
+                <li>✅ Cooldown Istirahat 60 detik setiap 20 pesan</li>
+                <li>✅ Simulasi Status "Sedang Mengetik..." sebelum kirim</li>
+                <li>✅ Rotasi Multi-Akun Otomatis</li>
+                <li>✅ Auto-Blacklist saat pelanggan membalas "STOP"</li>
+              </ul>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-submit-campaign">
+              🚀 Mulai Antrean Broadcast Sekarang
+            </button>
+          </form>
+        </div>
+
+        <!-- Right Column: WhatsApp Smartphone Live Mockup -->
+        <div class="phone-mockup-wrapper">
+          <div class="mockup-header-title">
+            <h3>📱 Preview Tampilan di WhatsApp HP Penerima</h3>
+            <p>Simulasi langsung pesan yang akan dibaca pelanggan.</p>
+          </div>
+
+          <!-- Smartphone Shell -->
+          <div class="smartphone-frame">
+            <div class="phone-notch">
+              <div class="phone-speaker"></div>
+              <div class="phone-camera"></div>
+            </div>
+
+            <!-- WhatsApp App Screen -->
+            <div class="wa-screen">
+              <div class="wa-app-header">
+                <div class="wa-back-btn">‹</div>
+                <div class="wa-header-avatar">BS</div>
+                <div class="wa-header-info">
+                  <div class="wa-contact-name" id="mockup-target-name">Budi Santoso</div>
+                  <div class="wa-contact-status">online</div>
+                </div>
+                <div class="wa-header-icons">
+                  <span>📹</span>
+                  <span>📞</span>
+                  <span>⋮</span>
                 </div>
               </div>
 
-              <div class="anti-ban-checklist">
-                <h4>🛡️ Proteksi Anti-Banned Aktif:</h4>
-                <ul>
-                  <li>✅ Jeda Acak Manusiawi (8 s/d 22 detik antar pesan)</li>
-                  <li>✅ Cooldown Istirahat 60 detik setiap 20 pesan</li>
-                  <li>✅ Simulasi Indikator "Sedang Mengetik..." sebelum kirim</li>
-                  <li>✅ Rotasi Multi-Akun Otomatis</li>
-                  <li>✅ Auto-Blacklist jika penerima membalas "STOP"</li>
-                </ul>
+              <!-- Chat Canvas with Doodle Pattern -->
+              <div class="wa-chat-canvas">
+                <div class="wa-date-pill">HARI INI</div>
+
+                <!-- Green Outgoing Chat Bubble -->
+                <div class="wa-bubble-container">
+                  <div class="wa-chat-bubble outgoing">
+                    <div class="bubble-text" id="mockup-rendered-text">
+                      Halo Kak Budi Santoso, kami ingin menginfokan promo terbaru kami...
+                    </div>
+                    <div class="bubble-meta">
+                      <span class="bubble-time" id="mockup-bubble-time">10:45</span>
+                      <span class="bubble-ticks">✓✓</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <button type="submit" class="btn btn-primary btn-block" id="btn-submit-campaign">
-                🚀 Mulai Antrean Broadcast
-              </button>
-            </form>
+              <!-- WA Footer bar -->
+              <div class="wa-fake-footer">
+                <div class="fake-input">Ketik pesan...</div>
+                <div class="fake-mic">🎙️</div>
+              </div>
+            </div>
           </div>
 
-          <div class="section-card">
-            <h2>Riwayat Kampanye Broadcast</h2>
-            <div class="table-responsive">
-              <table class="styled-table" id="campaigns-table">
-                <thead>
-                  <tr>
-                    <th>Judul</th>
-                    <th>Target</th>
-                    <th>Terkirim</th>
-                    <th>Status</th>
-                    <th>Dibuat</th>
-                  </tr>
-                </thead>
-                <tbody id="campaigns-tbody">
-                  <tr><td colspan="5" class="text-center">Belum ada riwayat kampanye.</td></tr>
-                </tbody>
-              </table>
+          <!-- Mockup Controls -->
+          <div class="mockup-controls">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-reroll-mockup">
+              🎲 Uji Acak Variasi Spintax
+            </button>
+            <div class="mockup-name-picker">
+              <label>Tes Nama:</label>
+              <select id="mockup-name-select" class="styled-select-sm">
+                <option value="Budi Santoso">Budi Santoso</option>
+                <option value="Siti Nurhaliza">Siti Nurhaliza</option>
+                <option value="Ahmad Dhani">Ahmad Dhani</option>
+                <option value="Pelanggan Setia">Pelanggan Setia</option>
+              </select>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- View 4: Reports & Analytics -->
-      <section id="view-reports" class="tab-view">
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-icon">👥</div>
-            <div class="kpi-value" id="kpi-total-contacts">0</div>
-            <div class="kpi-title">Total Kontak Terdata</div>
+      <!-- Campaign History Table -->
+      <div class="section-card history-card">
+        <h2>Riwayat Kampanye Broadcast</h2>
+        <div class="table-responsive">
+          <table class="styled-table" id="campaigns-table">
+            <thead>
+              <tr>
+                <th>Judul</th>
+                <th>Target</th>
+                <th>Terkirim</th>
+                <th>Status</th>
+                <th>Dibuat</th>
+              </tr>
+            </thead>
+            <tbody id="campaigns-tbody">
+              <tr><td colspan="5" class="text-center">Belum ada riwayat kampanye.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 6: Laporan & Audit CS -->
+    <section id="view-reports" class="tab-view">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">👥</div>
+          <div class="kpi-value" id="kpi-total-contacts">0</div>
+          <div class="kpi-title">Total Kontak Terdata</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">📤</div>
+          <div class="kpi-value" id="kpi-total-messages">0</div>
+          <div class="kpi-title">Total Pesan Terkirim</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">🤖</div>
+          <div class="kpi-value" id="kpi-bot-replies">0</div>
+          <div class="kpi-title">Balasan Bot Otomatis</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon">👨‍💼</div>
+          <div class="kpi-value" id="kpi-agent-replies">0</div>
+          <div class="kpi-title">Balasan CS Manusia</div>
+        </div>
+      </div>
+
+      <div class="reports-tables-grid">
+        <div class="section-card">
+          <div class="section-header">
+            <h3>📊 Produktivitas Staf CS ("Siapa yang Balas")</h3>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-icon">📤</div>
-            <div class="kpi-value" id="kpi-total-messages">0</div>
-            <div class="kpi-title">Total Pesan Terkirim</div>
+          <table class="styled-table" id="agent-report-table">
+            <thead>
+              <tr>
+                <th>Nama Staf</th>
+                <th>Email</th>
+                <th>Pesan Dikirim</th>
+                <th>Chat Ditangani</th>
+              </tr>
+            </thead>
+            <tbody id="agent-report-tbody">
+              <tr><td colspan="4" class="text-center">Memuat data staf...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-card">
+          <div class="section-header">
+            <h3>📱 Trafik & Kesehatan Nomor WhatsApp</h3>
+            <a href="/api/reports/export-csv" class="btn btn-outline btn-sm" download>📥 Download Log CSV</a>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-icon">🤖</div>
-            <div class="kpi-value" id="kpi-bot-replies">0</div>
-            <div class="kpi-title">Balasan Bot Otomatis</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon">👨‍💼</div>
-            <div class="kpi-value" id="kpi-agent-replies">0</div>
-            <div class="kpi-title">Balasan CS Manusia</div>
+          <table class="styled-table" id="account-report-table">
+            <thead>
+              <tr>
+                <th>Label Akun</th>
+                <th>Nomor</th>
+                <th>Status</th>
+                <th>Terkirim Hari Ini</th>
+                <th>Batas Kuota</th>
+              </tr>
+            </thead>
+            <tbody id="account-report-tbody">
+              <tr><td colspan="5" class="text-center">Memuat data akun...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal 1: Login & Ganti Pengguna -->
+  <div class="modal-overlay" id="login-modal" style="display:none;">
+    <div class="modal-card login-card">
+      <div class="modal-header">
+        <div>
+          <h3>🔐 Masuk ke WA-CRM</h3>
+          <p class="modal-subtitle">Pilih pengguna atau masukkan kredensial akun staf Anda.</p>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="quick-login-box">
+          <span class="quick-title">Pilih Akun Demo Cepat:</span>
+          <div class="quick-login-buttons">
+            <button type="button" class="btn-quick-login" data-email="admin@wa-crm.io" data-pass="password123">
+              👑 Admin Utama (Akses Penuh)
+            </button>
+            <button type="button" class="btn-quick-login" data-email="siti@wa-crm.io" data-pass="password123">
+              👩‍💼 Siti Nurhaliza (CS-1)
+            </button>
+            <button type="button" class="btn-quick-login" data-email="budi@wa-crm.io" data-pass="password123">
+              👨‍💼 Budi Santoso (CS-2)
+            </button>
           </div>
         </div>
 
-        <div class="reports-tables-grid">
-          <div class="section-card">
-            <div class="section-header">
-              <h3>📊 Produktivitas Staf Customer Service ("Siapa yang Balas")</h3>
-            </div>
-            <table class="styled-table" id="agent-report-table">
-              <thead>
-                <tr>
-                  <th>Nama Staf</th>
-                  <th>Email</th>
-                  <th>Pesan Dikirim</th>
-                  <th>Chat Ditangani</th>
-                </tr>
-              </thead>
-              <tbody id="agent-report-tbody">
-                <tr><td colspan="4" class="text-center">Memuat data staf...</td></tr>
-              </tbody>
-            </table>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="login-email">Email Akun:</label>
+            <input type="email" id="login-email" required placeholder="admin@wa-crm.io">
           </div>
-
-          <div class="section-card">
-            <div class="section-header">
-              <h3>📱 Trafik & Kesehatan Nomor WhatsApp</h3>
-              <a href="/api/reports/export-csv" class="btn btn-outline btn-sm" download>📥 Download Log CSV</a>
-            </div>
-            <table class="styled-table" id="account-report-table">
-              <thead>
-                <tr>
-                  <th>Label Akun</th>
-                  <th>Nomor</th>
-                  <th>Status</th>
-                  <th>Terkirim Hari Ini</th>
-                  <th>Batas Kuota</th>
-                </tr>
-              </thead>
-              <tbody id="account-report-tbody">
-                <tr><td colspan="5" class="text-center">Memuat data akun...</td></tr>
-              </tbody>
-            </table>
+          <div class="form-group">
+            <label for="login-password">Password:</label>
+            <input type="password" id="login-password" required placeholder="••••••••">
           </div>
-        </div>
-      </section>
-    </main>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-submit-login">
+            Masuk ke Sistem
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
-  <!-- Modal QR Code WhatsApp -->
+  <!-- Modal 2: QR Code WhatsApp -->
   <div class="modal-overlay" id="qr-modal" style="display:none;">
     <div class="modal-card">
       <div class="modal-header">
@@ -316,7 +549,7 @@
     </div>
   </div>
 
-  <!-- Modal Tambah Akun -->
+  <!-- Modal 3: Tambah Akun WhatsApp -->
   <div class="modal-overlay" id="add-account-modal" style="display:none;">
     <div class="modal-card">
       <div class="modal-header">
@@ -335,6 +568,72 @@
             <small class="hint">Disarankan 100-200 pesan/hari untuk nomor baru.</small>
           </div>
           <button type="submit" class="btn btn-primary btn-block">Simpan & Munculkan QR</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Tambah / Edit Aturan Bot -->
+  <div class="modal-overlay" id="bot-rule-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="bot-rule-modal-title">Tambah Aturan Balasan Bot</h3>
+        <button class="modal-close" id="btn-close-bot-rule">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="bot-rule-form">
+          <input type="hidden" id="bot-rule-id">
+          <div class="form-group">
+            <label for="rule-trigger-type">Tipe Pemicu (Trigger):</label>
+            <select id="rule-trigger-type" class="styled-select" required>
+              <option value="CONTAINS">CONTAINS (Pesan mengandung kata)</option>
+              <option value="EXACT">EXACT (Sama persis)</option>
+              <option value="NUMERIC_MENU">NUMERIC_MENU (Angka menu: 1, 2, 3)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="rule-keyword">Kata Kunci / Keyword:</label>
+            <input type="text" id="rule-keyword" required placeholder="Contoh: harga, promo, 1, bantuan">
+          </div>
+          <div class="form-group">
+            <label for="rule-action">Tindakan Bot:</label>
+            <select id="rule-action" class="styled-select" required>
+              <option value="REPLY">REPLY (Kirim teks balasan otomatis)</option>
+              <option value="HANDOVER_AGENT">HANDOVER_AGENT (Alihkan ke Staf CS Manusia)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="rule-reply-text">Teks Balasan:</label>
+            <textarea id="rule-reply-text" rows="4" required placeholder="Ketik teks balasan otomatis yang dikirim bot..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="rule-priority">Prioritas (Makin besar makin diutamakan):</label>
+            <input type="number" id="rule-priority" value="10" min="0" max="100">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="btn-save-bot-rule">Simpan Aturan</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: Tambah Kontak Manual -->
+  <div class="modal-overlay" id="add-contact-modal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Tambah Kontak Pelanggan Baru</h3>
+        <button class="modal-close" id="btn-close-add-contact">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="add-contact-form">
+          <div class="form-group">
+            <label for="contact-phone">Nomor WhatsApp:</label>
+            <input type="text" id="contact-phone" required placeholder="Contoh: 081234567890 atau 6281234567890">
+          </div>
+          <div class="form-group">
+            <label for="contact-name">Nama Kontak (Opsional):</label>
+            <input type="text" id="contact-name" placeholder="Contoh: Bpk. Bambang Sutrisno">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Simpan Kontak</button>
         </form>
       </div>
     </div>
