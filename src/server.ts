@@ -10,6 +10,7 @@ import { accountRouter } from './api/accounts';
 import { contactRouter } from './api/contacts';
 import { botRuleRouter } from './api/bot-rules';
 import { sessionEvents } from './whatsapp/session-manager';
+import { requireAuth, requireRole } from './middleware/auth';
 
 export function createServer() {
   const app = express();
@@ -23,12 +24,17 @@ export function createServer() {
 
   // REST API Routes
   app.use('/api/auth', authRouter);
-  app.use('/api/conversations', conversationRouter);
-  app.use('/api/campaigns', campaignRouter);
-  app.use('/api/reports', reportRouter);
-  app.use('/api/accounts', accountRouter);
-  app.use('/api/contacts', contactRouter);
-  app.use('/api/bot-rules', botRuleRouter);
+
+  // Protected routes (Admin & Agent)
+  app.use('/api/conversations', requireAuth, conversationRouter);
+  app.use('/api/contacts', requireAuth, contactRouter);
+
+  // Admin-only routes
+  app.use('/api/accounts', requireAuth, requireRole(['ADMIN']), accountRouter);
+  app.use('/api/bot-rules', requireAuth, requireRole(['ADMIN']), botRuleRouter);
+  app.use('/api/campaigns', requireAuth, requireRole(['ADMIN']), campaignRouter);
+  app.use('/api/reports', requireAuth, requireRole(['ADMIN']), reportRouter);
+
   app.use(express.static('public'));
 
   // Wire Baileys Events to Socket.IO
