@@ -1,12 +1,42 @@
+// ==========================================================================
+// Authenticated Fetch Interceptor
+// ==========================================================================
+const originalFetch = window.fetch;
+window.fetch = async function (url, options = {}) {
+  const token = localStorage.getItem('wa_token');
+  if (token) {
+    options.headers = options.headers || {};
+    if (options.headers instanceof Headers) {
+      if (!options.headers.has('Authorization')) {
+        options.headers.set('Authorization', `Bearer ${token}`);
+      }
+    } else if (Array.isArray(options.headers)) {
+      if (!options.headers.some(h => h[0].toLowerCase() === 'authorization')) {
+        options.headers.push(['Authorization', `Bearer ${token}`]);
+      }
+    } else {
+      if (!options.headers['Authorization'] && !options.headers['authorization']) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+  }
+
+  const response = await originalFetch(url, options);
+
+  // If unauthorized (401), prompt login overlay
+  if (response.status === 401 && typeof url === 'string' && !url.includes('/api/auth/login')) {
+    localStorage.removeItem('wa_token');
+    localStorage.removeItem('wa_user');
+    showLoginOverlay('Sesi telah kedaluwarsa. Silakan masuk kembali.');
+  }
+
+  return response;
+};
+
 // State Management
 const state = {
   currentTab: 'inbox',
-  currentUser: {
-    id: 'cs-1',
-    name: 'Admin Utama',
-    email: 'admin@wa-crm.io',
-    role: 'ADMIN'
-  },
+  currentUser: null,
   activeConversationId: null,
   conversations: [],
   accounts: [],
@@ -150,8 +180,26 @@ socket.on('contacts:synced', (data) => {
 });
 
 // App Initialization
-document.addEventListener('DOMContentLoaded', () => {
-  initAuth();
+document.addEventListener('DOMContentLoaded', async () => {
+  setupAuthEventListeners();
+  const isAuthenticated = await initAuth();
+  if (isAuthenticated) {
+    initAppModules();
+  }
+
+  // Periodic polling for background updates (only when logged in)
+  setInterval(() => {
+    if (!localStorage.getItem('wa_token')) return;
+    if (state.currentTab === 'inbox') loadConversations();
+    if (state.currentTab === 'reports') loadReports();
+    loadSummaryMetrics();
+  }, 5000);
+});
+
+let appModulesInitialized = false;
+function initAppModules() {
+  if (appModulesInitialized) return;
+  appModulesInitialized = true;
   initTabs();
   initInbox();
   initAccounts();
@@ -159,59 +207,34 @@ document.addEventListener('DOMContentLoaded', () => {
   initBotRules();
   initBroadcast();
   loadSummaryMetrics();
-
-  // Periodic polling for background updates
-  setInterval(() => {
-    if (state.currentTab === 'inbox') loadConversations();
-    if (state.currentTab === 'reports') loadReports();
-    loadSummaryMetrics();
-  }, 5000);
-});
+}
 
 // ==========================================================================
 // Authentication & RBAC Flow
 // ==========================================================================
-function initAuth() {
-  const savedUser = localStorage.getItem('wa_user');
-  if (savedUser) {
-    try {
-      state.currentUser = JSON.parse(savedUser);
-      applyUserRole(state.currentUser);
-    } catch (_) {
-      showLoginModal();
-    }
-  } else {
-    // Default to admin from seed
-    state.currentUser = {
-      id: 'admin',
-      name: 'Admin Utama',
-      email: 'admin@wa-crm.io',
-      role: 'ADMIN'
-    };
-    localStorage.setItem('wa_user', JSON.stringify(state.currentUser));
-    applyUserRole(state.currentUser);
-  }
-
-  // Switch Account Button
-  const btnSwitch = document.getElementById('btn-switch-account');
-  if (btnSwitch) {
-    btnSwitch.addEventListener('click', () => {
-      showLoginModal();
+function setupAuthEventListeners() {
+  // Logout Button
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      handleLogout();
     });
   }
 
-  // Quick Login Buttons
-  document.querySelectorAll('.btn-quick-login').forEach(btn => {
+  // Quick Demo Login Buttons
+  document.querySelectorAll('.btn-demo-acc').forEach(btn => {
     btn.addEventListener('click', () => {
       const email = btn.dataset.email;
-      const pass = btn.dataset.pass;
-      document.getElementById('login-email').value = email;
-      document.getElementById('login-password').value = pass;
+      const pass = btn.dataset.pass || 'password123';
+      const emailInput = document.getElementById('login-email');
+      const passInput = document.getElementById('login-password');
+      if (emailInput) emailInput.value = email;
+      if (passInput) passInput.value = pass;
       performLogin(email, pass);
     });
   });
 
-  // Login Form
+  // Login Form Submission
   const loginForm = document.getElementById('login-form');
   if (loginForm) {
     loginForm.addEventListener('submit', (e) => {
@@ -223,37 +246,111 @@ function initAuth() {
   }
 }
 
-function showLoginModal() {
-  const modal = document.getElementById('login-modal');
-  if (modal) modal.style.display = 'flex';
+async function initAuth() {
+  const token = localStorage.getItem('wa_token');
+  if (!token) {
+    showLoginOverlay();
+    return false;
+  }
+
+  try {
+    const res = await fetch('/api/auth/me');
+    const json = await res.json();
+    if (json.success && json.user) {
+      state.currentUser = json.user;
+      localStorage.setItem('wa_user', JSON.stringify(json.user));
+      applyUserRole(json.user);
+      hideLoginOverlay();
+      return true;
+    } else {
+      localStorage.removeItem('wa_token');
+      localStorage.removeItem('wa_user');
+      showLoginOverlay('Sesi kedaluwarsa. Silakan masuk kembali.');
+      return false;
+    }
+  } catch (err) {
+    showLoginOverlay('Gagal memverifikasi sesi ke server.');
+    return false;
+  }
 }
 
-function hideLoginModal() {
-  const modal = document.getElementById('login-modal');
-  if (modal) modal.style.display = 'none';
+function showLoginOverlay(errorMsg = '') {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  const errEl = document.getElementById('login-error-msg');
+  if (errEl) {
+    if (errorMsg) {
+      errEl.textContent = errorMsg;
+      errEl.style.display = 'block';
+    } else {
+      errEl.style.display = 'none';
+      errEl.textContent = '';
+    }
+  }
+}
+
+function hideLoginOverlay() {
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.style.display = 'none';
 }
 
 async function performLogin(email, password) {
+  const errEl = document.getElementById('login-error-msg');
+  const btnSubmit = document.getElementById('btn-submit-login');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = '⏳ Memproses...'; }
+
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await originalFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
     const json = await res.json();
-    if (json.success && json.user) {
-      state.currentUser = json.user;
+    if (json.success && json.token && json.user) {
+      localStorage.setItem('wa_token', json.token);
       localStorage.setItem('wa_user', JSON.stringify(json.user));
-      if (json.token) localStorage.setItem('wa_token', json.token);
+      state.currentUser = json.user;
       applyUserRole(json.user);
-      hideLoginModal();
+      hideLoginOverlay();
+      initAppModules();
       showToast(`Selamat datang, ${json.user.name}!`, 'success');
     } else {
-      showToast(json.error || 'Login gagal. Periksa email & password.', 'error');
+      const msg = json.error || 'Email atau password salah.';
+      if (errEl) {
+        errEl.textContent = msg;
+        errEl.style.display = 'block';
+      } else {
+        showToast(msg, 'error');
+      }
     }
   } catch (err) {
-    showToast('Terjadi kesalahan saat login: ' + err.message, 'error');
+    const msg = 'Terjadi kesalahan saat login: ' + err.message;
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    } else {
+      showToast(msg, 'error');
+    }
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = '🔒 Masuk ke Sistem';
+    }
   }
+}
+
+function handleLogout() {
+  localStorage.removeItem('wa_token');
+  localStorage.removeItem('wa_user');
+  state.currentUser = null;
+  state.activeConversationId = null;
+  state.conversations = [];
+  state.accounts = [];
+  state.contacts = [];
+  state.campaigns = [];
+  showToast('Anda telah keluar dari sistem.', 'info');
+  showLoginOverlay();
 }
 
 function applyUserRole(user) {
