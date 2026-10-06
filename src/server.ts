@@ -8,6 +8,7 @@ import { campaignRouter } from './api/campaigns';
 import { reportRouter } from './api/reports';
 import { accountRouter } from './api/accounts';
 import { contactRouter } from './api/contacts';
+import { botRuleRouter } from './api/bot-rules';
 import { sessionEvents } from './whatsapp/session-manager';
 
 export function createServer() {
@@ -27,6 +28,7 @@ export function createServer() {
   app.use('/api/reports', reportRouter);
   app.use('/api/accounts', accountRouter);
   app.use('/api/contacts', contactRouter);
+  app.use('/api/bot-rules', botRuleRouter);
   app.use(express.static('public'));
 
   // Wire Baileys Events to Socket.IO
