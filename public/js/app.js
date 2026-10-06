@@ -731,6 +731,9 @@ function initContacts() {
 }
 
 async function syncPhoneContacts() {
+  if (!state.accounts || state.accounts.length === 0) {
+    await loadAccounts();
+  }
   const connectedAccount = state.accounts.find(a => a.status === 'CONNECTED');
   if (!connectedAccount) {
     showToast('Tidak ada akun WhatsApp yang sedang terhubung. Hubungkan akun terlebih dahulu.', 'warning');

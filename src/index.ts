@@ -1,6 +1,7 @@
 import { createServer } from './server';
 import { config } from './config';
 import { QueueDispatcher } from './queue/dispatcher';
+import { SessionManager } from './whatsapp/session-manager';
 
 // Prevent Baileys WebSocket network timeouts from crashing Node.js
 process.on('unhandledRejection', (reason) => {
@@ -15,6 +16,9 @@ const { server } = createServer();
 
 server.listen(config.port, () => {
   console.log(`🚀 WA Web CRM Server running on http://localhost:${config.port}`);
+
+  // Restore existing WhatsApp sessions
+  SessionManager.restoreAllSessions();
 
   // Background queue loop runner
   setInterval(async () => {

@@ -84,7 +84,7 @@ contactRouter.post('/sync/:accountId', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Akun WhatsApp tidak ditemukan' });
     }
 
-    const socket = SessionManager.getSession(accountId);
+    const socket = SessionManager.getSocket(accountId);
     if (!socket) {
       return res.status(400).json({ success: false, error: 'Akun WhatsApp sedang tidak terhubung' });
     }

@@ -22,6 +22,10 @@ export class SessionManager {
     return this.sessions.get(accountId);
   }
 
+  static getSession(accountId: string): WASocket | undefined {
+    return this.getSocket(accountId);
+  }
+
   static getLastQr(accountId: string): string | undefined {
     return this.lastQrMap.get(accountId);
   }
@@ -167,5 +171,21 @@ export class SessionManager {
     const socket = this.getSocket(accountId);
     if (!socket) throw new Error(`WhatsApp account ${accountId} is not connected.`);
     return await socket.sendMessage(toJid, { text });
+  }
+
+  static async restoreAllSessions(): Promise<void> {
+    try {
+      const accounts = await prisma.whatsappAccount.findMany({
+        where: { status: 'CONNECTED' }
+      });
+      for (const acc of accounts) {
+        console.log(`🔄 Restoring saved session for account ${acc.labelName} (${acc.id})...`);
+        this.initSession(acc.id).catch((err) => {
+          console.warn(`Could not restore session for ${acc.id}:`, err.message);
+        });
+      }
+    } catch (e: any) {
+      console.warn('Restore sessions error:', e.message);
+    }
   }
 }
