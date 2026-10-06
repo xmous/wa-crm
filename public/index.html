@@ -706,24 +706,22 @@
       <form id="login-form">
         <div class="form-group">
           <label for="login-email">Email Akun:</label>
-          <input type="email" id="login-email" required placeholder="admin@wa-crm.io" class="styled-input" autocomplete="username">
+          <input type="email" id="login-email" required placeholder="nama@perusahaan.com" class="styled-input" autocomplete="username">
         </div>
         <div class="form-group">
-          <label for="login-password">Kata Sandi (Password):</label>
-          <input type="password" id="login-password" required placeholder="••••••••" class="styled-input" autocomplete="current-password">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label for="login-password" style="margin:0;">Kata Sandi (Password):</label>
+            <button type="button" id="btn-toggle-pwd" style="background:none; border:none; color:var(--accent-blue); font-size:0.75rem; cursor:pointer; padding:0;">👁️ Lihat</button>
+          </div>
+          <input type="password" id="login-password" required placeholder="Masukkan kata sandi..." class="styled-input" autocomplete="current-password">
         </div>
         <div id="login-error-msg" class="login-error" style="display: none;"></div>
-        <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block btn-lg" style="margin-top: 8px;">
+        <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block btn-lg" style="margin-top: 10px;">
           🔒 Masuk ke Sistem
         </button>
       </form>
-      <div class="demo-logins">
-        <small>Pilih Cepat Akun Demo (Password: password123):</small>
-        <div class="demo-buttons">
-          <button type="button" class="btn-demo-acc" data-email="admin@wa-crm.io" data-pass="password123">👑 Admin</button>
-          <button type="button" class="btn-demo-acc" data-email="siti@wa-crm.io" data-pass="password123">🎧 CS Siti (Agent)</button>
-          <button type="button" class="btn-demo-acc" data-email="budi@wa-crm.io" data-pass="password123">🎧 CS Budi (Agent)</button>
-        </div>
+      <div class="login-footer-info">
+        <span class="secure-badge">🛡️ Portal Resmi WA-CRM • Enkripsi Sesi Aktif</span>
       </div>
     </div>
   </div>

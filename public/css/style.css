@@ -1666,47 +1666,19 @@ select:focus {
   text-align: center;
 }
 
-.demo-logins {
+.login-footer-info {
   border-top: 1px solid var(--border-color);
-  padding-top: 16px;
+  padding-top: 14px;
   text-align: center;
 }
 
-.demo-logins small {
+.secure-badge {
   color: var(--text-dim);
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-  display: block;
-  margin-bottom: 10px;
-}
-
-.demo-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-}
-
-.btn-demo-acc {
-  background: rgba(30, 44, 72, 0.7);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: #cbd5e1;
-  padding: 8px 6px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-  font-family: inherit;
-}
-
-.btn-demo-acc:hover {
-  background: rgba(37, 211, 102, 0.15);
-  border-color: var(--brand-green);
-  color: #ffffff;
-  transform: translateY(-1px);
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @keyframes fadeIn {

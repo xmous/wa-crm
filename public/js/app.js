@@ -221,18 +221,16 @@ function setupAuthEventListeners() {
     });
   }
 
-  // Quick Demo Login Buttons
-  document.querySelectorAll('.btn-demo-acc').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const email = btn.dataset.email;
-      const pass = btn.dataset.pass || 'password123';
-      const emailInput = document.getElementById('login-email');
-      const passInput = document.getElementById('login-password');
-      if (emailInput) emailInput.value = email;
-      if (passInput) passInput.value = pass;
-      performLogin(email, pass);
+  // Toggle Password Visibility
+  const btnTogglePwd = document.getElementById('btn-toggle-pwd');
+  const pwdInput = document.getElementById('login-password');
+  if (btnTogglePwd && pwdInput) {
+    btnTogglePwd.addEventListener('click', () => {
+      const isPwd = pwdInput.type === 'password';
+      pwdInput.type = isPwd ? 'text' : 'password';
+      btnTogglePwd.textContent = isPwd ? '🙈 Sembunyi' : '👁️ Lihat';
     });
-  });
+  }
 
   // Login Form Submission
   const loginForm = document.getElementById('login-form');
