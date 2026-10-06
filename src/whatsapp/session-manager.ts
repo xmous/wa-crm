@@ -3,6 +3,7 @@ import makeWASocket, {
   WASocket, 
   useMultiFileAuthState 
 } from '@whiskeysockets/baileys';
+import QRCode from 'qrcode';
 import { prisma } from '../database/client';
 import { sleep } from '../utils/delay';
 import EventEmitter from 'events';
@@ -11,6 +12,7 @@ export const sessionEvents = new EventEmitter();
 
 export class SessionManager {
   private static sessions: Map<string, WASocket> = new Map();
+  private static lastQrMap: Map<string, string> = new Map();
 
   static getActiveSessions(): string[] {
     return Array.from(this.sessions.keys());
@@ -18,6 +20,10 @@ export class SessionManager {
 
   static getSocket(accountId: string): WASocket | undefined {
     return this.sessions.get(accountId);
+  }
+
+  static getLastQr(accountId: string): string | undefined {
+    return this.lastQrMap.get(accountId);
   }
 
   static async initSession(accountId: string): Promise<WASocket> {
@@ -34,7 +40,14 @@ export class SessionManager {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        sessionEvents.emit('qr', { accountId, qr });
+        try {
+          const qrImage = await QRCode.toDataURL(qr, { width: 260, margin: 2 });
+          this.lastQrMap.set(accountId, qrImage);
+          sessionEvents.emit('qr', { accountId, qr, qrImage });
+        } catch (qrErr) {
+          console.error('Failed to generate QR data URL:', qrErr);
+          sessionEvents.emit('qr', { accountId, qr });
+        }
         try {
           await prisma.whatsappAccount.update({
             where: { id: accountId },

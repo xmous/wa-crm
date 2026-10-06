@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 </head>
 <body class="dark-theme">
   <div class="app-wrapper">
@@ -306,7 +305,7 @@
       <div class="modal-body text-center">
         <p>Buka WhatsApp di HP Anda &gt; Setelan &gt; Perangkat Tertaut &gt; Tautkan Perangkat.</p>
         <div class="qr-canvas-wrapper">
-          <canvas id="qr-canvas"></canvas>
+          <img id="qr-image" alt="QR Code" style="display:none; width: 240px; height: 240px; border-radius: 8px;" />
           <div class="qr-loading" id="qr-loading-spinner" style="display:none;">
             <div class="spinner"></div>
             <span>Menghasilkan QR Code...</span>

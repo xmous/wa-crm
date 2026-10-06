@@ -27,13 +27,12 @@ socket.on('disconnect', () => {
 socket.on('wa:qr', (data) => {
   console.log('QR Code received for account:', data.accountId);
   if (state.activeQrAccountId === data.accountId) {
-    const canvas = document.getElementById('qr-canvas');
     const spinner = document.getElementById('qr-loading-spinner');
+    const img = document.getElementById('qr-image');
     if (spinner) spinner.style.display = 'none';
-    if (canvas && window.QRCode) {
-      QRCode.toCanvas(canvas, data.qr, { width: 240, margin: 2 }, (error) => {
-        if (error) console.error(error);
-      });
+    if (img && data.qrImage) {
+      img.src = data.qrImage;
+      img.style.display = 'block';
     }
   }
 });
@@ -382,20 +381,30 @@ async function loadAccounts() {
   }
 }
 
-window.openQrModal = function(id, label) {
+window.openQrModal = async function(id, label) {
   state.activeQrAccountId = id;
   const modal = document.getElementById('qr-modal');
   const title = document.getElementById('qr-modal-title');
   const spinner = document.getElementById('qr-loading-spinner');
-  const canvas = document.getElementById('qr-canvas');
+  const img = document.getElementById('qr-image');
 
   title.textContent = `Scan QR: ${label}`;
+  if (img) img.style.display = 'none';
   if (spinner) spinner.style.display = 'block';
-  if (canvas) {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
   modal.style.display = 'flex';
+
+  // Check if QR already cached on backend
+  try {
+    const qrRes = await fetch(`/api/accounts/${id}/qr`);
+    const qrJson = await qrRes.json();
+    if (qrJson.success && qrJson.qrImage) {
+      if (spinner) spinner.style.display = 'none';
+      if (img) {
+        img.src = qrJson.qrImage;
+        img.style.display = 'block';
+      }
+    }
+  } catch (_) {}
 
   fetch(`/api/accounts/${id}/connect`, { method: 'POST' });
 };

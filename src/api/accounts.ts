@@ -56,3 +56,14 @@ accountRouter.post('/:id/connect', async (req: Request, res: Response) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// Get current QR code for an account
+accountRouter.get('/:id/qr', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const qrImage = SessionManager.getLastQr(id);
+    return res.json({ success: true, qrImage: qrImage || null });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
