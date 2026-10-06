@@ -75,6 +75,16 @@ export class SessionManager {
             data: { status: 'CONNECTED', phoneNumber: phone }
           });
         } catch (_) {}
+
+        // Upload fresh pre-keys to WhatsApp server to avoid "Menunggu pesan ini" and E2EE decryption errors
+        try {
+          if (typeof (socket as any).uploadPreKeysToServer === 'function') {
+            await (socket as any).uploadPreKeysToServer(30);
+            console.log(`🔑 [Pre-Keys] Berhasil mengunggah pre-keys segar untuk akun ${accountId} (${phone})`);
+          }
+        } catch (pkErr: any) {
+          console.warn(`Pre-keys upload note for ${accountId}:`, pkErr.message);
+        }
       }
 
       if (connection === 'close') {
