@@ -84,21 +84,64 @@ contactRouter.post('/sync/:accountId', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Akun WhatsApp tidak ditemukan' });
     }
 
-    const socket = SessionManager.getSocket(accountId);
-    if (!socket) {
-      return res.status(400).json({ success: false, error: 'Akun WhatsApp sedang tidak terhubung' });
-    }
+    const currentCount = await SessionManager.requestSync(accountId);
 
-    // Baileys maintains in-memory contact store if supported, or requests sync
-    // Count existing contacts in DB
-    const currentCount = await prisma.contact.count();
-
-    sessionEvents.emit('contacts:synced', { accountId, count: currentCount });
     res.json({
       success: true,
-      message: 'Permintaan sinkronisasi kontak dari WhatsApp telah dikirim',
+      message: 'Permintaan sinkronisasi kontak dari WhatsApp telah dikirim ke HP',
       currentCount
     });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/contacts/export-csv - Download all contacts as CSV
+contactRouter.get('/export-csv', async (_req, res) => {
+  try {
+    const contacts = await prisma.contact.findMany({
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    let csv = 'Nomor_WhatsApp,Nama_Kontak,Status,Terakhir_Diperbarui\n';
+    for (const c of contacts) {
+      const name = c.name ? `"${c.name.replace(/"/g, '""')}"` : '-';
+      const status = c.isBlacklisted ? 'BLACKLIST' : 'AKTIF';
+      csv += `${c.phoneNumber},${name},${status},${c.updatedAt.toISOString()}\n`;
+    }
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment(`buku-kontak-wa-${new Date().toISOString().slice(0, 10)}.csv`);
+    return res.send(csv);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/contacts/batch-import - Import contacts from uploaded CSV/list
+contactRouter.post('/batch-import', async (req, res) => {
+  try {
+    const { contacts } = req.body;
+    if (!Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ success: false, error: 'Daftar kontak kosong' });
+    }
+
+    let imported = 0;
+    for (const item of contacts) {
+      if (!item.phoneNumber) continue;
+      const { cleanNumber } = formatE164(item.phoneNumber);
+      if (cleanNumber.length < 5) continue;
+      try {
+        await prisma.contact.upsert({
+          where: { phoneNumber: cleanNumber },
+          create: { phoneNumber: cleanNumber, name: item.name?.trim() || null },
+          update: { name: item.name?.trim() || undefined }
+        });
+        imported++;
+      } catch (_) {}
+    }
+
+    res.json({ success: true, imported, total: contacts.length });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

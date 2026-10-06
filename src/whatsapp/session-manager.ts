@@ -131,25 +131,72 @@ export class SessionManager {
       }
     });
 
-    // 2. Listen for Contacts Sync from Phone
+    // 2. Helper to safely store contact in PostgreSQL
+    const handleSaveContact = async (rawJid: string, name?: string | null) => {
+      if (!rawJid || rawJid.endsWith('@g.us') || rawJid.includes('status@broadcast')) return;
+      const phone = rawJid.split('@')[0].split(':')[0];
+      if (phone.length < 5) return;
+      try {
+        await prisma.contact.upsert({
+          where: { phoneNumber: phone },
+          create: { phoneNumber: phone, name: name || null },
+          update: { name: name || undefined }
+        });
+      } catch (_) {}
+    };
+
+    // 3. Listen for Contacts Upsert from Phone
     socket.ev.on('contacts.upsert', async (contacts) => {
       try {
         for (const c of contacts) {
-          if (!c.id || c.id.endsWith('@g.us')) continue;
-          const phone = c.id.split('@')[0];
-          const name = c.name || c.notify || null;
-          try {
-            await prisma.contact.upsert({
-              where: { phoneNumber: phone },
-              create: { phoneNumber: phone, name },
-              update: { name: name || undefined }
-            });
-          } catch (_) {}
+          await handleSaveContact(c.id, c.name || c.notify);
         }
-        sessionEvents.emit('contacts:synced', { accountId, count: contacts.length });
+        const total = await prisma.contact.count();
+        sessionEvents.emit('contacts:synced', { accountId, count: total });
       } catch (err: any) {
         console.warn('Contacts sync error:', err.message);
       }
+    });
+
+    // 4. Listen for Contacts Update
+    socket.ev.on('contacts.update', async (updates) => {
+      try {
+        for (const u of updates) {
+          if (u.id) await handleSaveContact(u.id, u.name || (u as any).notify);
+        }
+      } catch (_) {}
+    });
+
+    // 5. Listen for Messaging History Sync (WhatsApp Phonebook & Chat History)
+    socket.ev.on('messaging-history.set', async ({ chats, contacts }) => {
+      try {
+        console.log(`📥 [History Sync] Diterima dari WhatsApp HP: ${contacts?.length || 0} kontak, ${chats?.length || 0} obrolan`);
+        if (contacts) {
+          for (const c of contacts) {
+            await handleSaveContact(c.id, c.name || c.notify);
+          }
+        }
+        if (chats) {
+          for (const ch of chats) {
+            await handleSaveContact(ch.id, ch.name);
+          }
+        }
+        const total = await prisma.contact.count();
+        sessionEvents.emit('contacts:synced', { accountId, count: total });
+      } catch (err: any) {
+        console.warn('History sync error:', err.message);
+      }
+    });
+
+    // 6. Listen for Chats Upsert
+    socket.ev.on('chats.upsert', async (chats) => {
+      try {
+        for (const ch of chats) {
+          await handleSaveContact(ch.id, ch.name);
+        }
+        const total = await prisma.contact.count();
+        sessionEvents.emit('contacts:synced', { accountId, count: total });
+      } catch (_) {}
     });
 
     return socket;
@@ -187,5 +234,20 @@ export class SessionManager {
     } catch (e: any) {
       console.warn('Restore sessions error:', e.message);
     }
+  }
+
+  static async requestSync(accountId: string): Promise<number> {
+    const socket = this.getSocket(accountId);
+    if (!socket) throw new Error('Akun WhatsApp sedang tidak terhubung');
+
+    try {
+      if (typeof (socket as any).resyncAppState === 'function') {
+        await (socket as any).resyncAppState(['regular_low', 'regular_high', 'regular'], true);
+      }
+    } catch (e: any) {
+      console.warn('resyncAppState error:', e.message);
+    }
+
+    return await prisma.contact.count();
   }
 }

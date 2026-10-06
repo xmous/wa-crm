@@ -16,5 +16,7 @@ describe('Contacts Router', () => {
     expect(routes.some((r: any) => r.path === '/' && r.method === 'get')).toBe(true);
     expect(routes.some((r: any) => r.path === '/' && r.method === 'post')).toBe(true);
     expect(routes.some((r: any) => r.path === '/sync/:accountId' && r.method === 'post')).toBe(true);
+    expect(routes.some((r: any) => r.path === '/export-csv' && r.method === 'get')).toBe(true);
+    expect(routes.some((r: any) => r.path === '/batch-import' && r.method === 'post')).toBe(true);
   });
 });

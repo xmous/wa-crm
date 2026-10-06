@@ -153,6 +153,9 @@
           </div>
           <div class="header-actions">
             <button class="btn btn-success" id="btn-sync-phone-contacts">🔄 Tarik Kontak dari WhatsApp HP</button>
+            <button class="btn btn-outline" id="btn-open-import-csv">📁 Import CSV/TXT</button>
+            <input type="file" id="contacts-csv-file" accept=".csv,.txt" style="display:none;">
+            <a href="/api/contacts/export-csv" class="btn btn-outline" download id="btn-export-contacts-csv">📥 Export CSV</a>
             <button class="btn btn-primary" id="btn-open-add-contact">+ Tambah Kontak Manual</button>
           </div>
         </div>
@@ -268,9 +271,15 @@
             <div class="form-group">
               <div class="label-row">
                 <label for="campaign-recipients">Daftar Nomor Penerima:</label>
-                <button type="button" class="btn-text highlight" id="btn-fill-phone-contacts">
-                  📋 Isi Otomatis dari Kontak WA HP (<span id="count-available-contacts">0</span>)
-                </button>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <button type="button" class="btn-text highlight" id="btn-fill-phone-contacts">
+                    📋 Isi dari Buku Kontak (<span id="count-available-contacts">0</span>)
+                  </button>
+                  <button type="button" class="btn-text highlight" id="btn-upload-recipients-file">
+                    📁 Upload CSV / TXT
+                  </button>
+                  <input type="file" id="broadcast-file-input" accept=".csv,.txt" style="display:none;">
+                </div>
               </div>
               <textarea id="campaign-recipients" rows="4" required placeholder="081234567890&#10;089876543210&#10;6285712345678"></textarea>
               <small class="hint">Format nomor otomatis dinormalisasi. Nomor yang STOP otomatis diabaikan.</small>

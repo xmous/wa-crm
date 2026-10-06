@@ -679,6 +679,65 @@ function initContacts() {
     });
   }
 
+  const importBtn = document.getElementById('btn-open-import-csv');
+  const importInput = document.getElementById('contacts-csv-file');
+
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const text = evt.target?.result as string || '';
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const contacts: Array<{ phoneNumber: string, name?: string }> = [];
+
+        for (const line of lines) {
+          // Check comma, semicolon, tab
+          const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ''));
+          if (parts.length >= 2) {
+            // Check which part is phone
+            const isFirstPhone = /^[0-9+]{6,}$/.test(parts[0]);
+            const phone = isFirstPhone ? parts[0] : parts[1];
+            const name = isFirstPhone ? parts[1] : parts[0];
+            if (/^[0-9+]{6,}$/.test(phone)) {
+              contacts.push({ phoneNumber: phone, name });
+            }
+          } else if (parts.length === 1 && /^[0-9+]{6,}$/.test(parts[0])) {
+            contacts.push({ phoneNumber: parts[0] });
+          }
+        }
+
+        if (contacts.length === 0) {
+          showToast('Tidak ada nomor telepon valid ditemukan dalam file', 'warning');
+          return;
+        }
+
+        try {
+          showToast(`Mengimpor ${contacts.length} kontak...`, 'info');
+          const res = await fetch('/api/contacts/batch-import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contacts })
+          });
+          const json = await res.json();
+          if (json.success) {
+            showToast(`✅ Berhasil mengimpor ${json.imported} kontak dari file!`, 'success');
+            loadContacts();
+            updateContactsCountBadge();
+          } else {
+            showToast(json.error || 'Gagal mengimpor kontak', 'error');
+          }
+        } catch (err: any) {
+          showToast('Gagal impor: ' + err.message, 'error');
+        }
+      };
+      reader.readAsText(file);
+      importInput.value = '';
+    });
+  }
+
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       document.getElementById('add-contact-modal').style.display = 'none';
@@ -1005,9 +1064,12 @@ function renderBotRulesTable() {
           </span>
         </td>
         <td>
-          <span class="badge-active" style="${r.isActive ? '' : 'background:#374151; color:#9ca3af;'}">
-            ${r.isActive ? 'AKTIF' : 'NONAKTIF'}
-          </span>
+          <button class="btn btn-sm ${r.isActive ? 'btn-success' : 'btn-outline'}" 
+                  onclick="toggleBotRuleActive('${r.id}', ${!r.isActive})" 
+                  title="Klik untuk ubah status aktif/nonaktif"
+                  style="min-width: 90px;">
+            ${r.isActive ? '✅ Aktif' : '⏸️ Nonaktif'}
+          </button>
         </td>
         <td>
           <div style="display:flex; gap:6px;">
@@ -1019,6 +1081,25 @@ function renderBotRulesTable() {
     `;
   }).join('');
 }
+
+window.toggleBotRuleActive = async function(id, nextActive) {
+  try {
+    const res = await fetch(`/api/bot-rules/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: nextActive })
+    });
+    const json = await res.json();
+    if (json.success) {
+      showToast(`Aturan bot berhasil ${nextActive ? 'diaktifkan' : 'dinonaktifkan'}`, 'success');
+      loadBotRules();
+    } else {
+      showToast(json.error || 'Gagal mengubah status aturan', 'error');
+    }
+  } catch (err: any) {
+    showToast('Gagal: ' + err.message, 'error');
+  }
+};
 
 window.editBotRule = function(id) {
   const rule = state.botRules.find(r => r.id === id);
@@ -1103,6 +1184,34 @@ function initBroadcast() {
       } catch (err) {
         showToast('Gagal memuat kontak: ' + err.message, 'error');
       }
+    });
+  }
+
+  // Upload CSV / TXT to fill recipients
+  const uploadRecipientsBtn = document.getElementById('btn-upload-recipients-file');
+  const broadcastFileInput = document.getElementById('broadcast-file-input');
+
+  if (uploadRecipientsBtn && broadcastFileInput) {
+    uploadRecipientsBtn.addEventListener('click', () => broadcastFileInput.click());
+    broadcastFileInput.addEventListener('change', (e) => {
+      const file = (e.target as any).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = (evt.target?.result as string) || '';
+        const matches = text.match(/(?:\+?62|0)[0-9]{8,14}/g);
+        if (matches && matches.length > 0) {
+          const unique = Array.from(new Set(matches.map(m => m.trim())));
+          const textarea = document.getElementById('campaign-recipients') as HTMLTextAreaElement;
+          const existing = textarea.value.trim();
+          textarea.value = existing ? `${existing}\n${unique.join('\n')}` : unique.join('\n');
+          showToast(`✅ Berhasil mengekstrak ${unique.length} nomor dari file!`, 'success');
+        } else {
+          showToast('Tidak ditemukan format nomor telepon valid dalam file', 'warning');
+        }
+      };
+      reader.readAsText(file);
+      (broadcastFileInput as any).value = '';
     });
   }
 
