@@ -77,14 +77,34 @@ conversationRouter.post('/:id/reply', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Conversation not found' });
     }
 
-    const toJid = `${conversation.contact.phoneNumber}@s.whatsapp.net`;
+    const rawTarget = conversation.contact.phoneNumber;
+    let toJid = rawTarget;
+    if (!rawTarget.includes('@')) {
+      if (!rawTarget.startsWith('62') && !rawTarget.startsWith('0') && rawTarget.length >= 13) {
+        toJid = `${rawTarget}@lid`;
+      } else {
+        let clean = rawTarget.replace(/\D/g, '');
+        if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+        toJid = `${clean}@s.whatsapp.net`;
+      }
+    }
 
     // 1. Send via WhatsApp (with human typing presence simulation)
     try {
       await SessionManager.simulateTyping(conversation.whatsappAccountId, toJid, 1000);
       await SessionManager.sendMessage(conversation.whatsappAccountId, toJid, text);
+      console.log(`📤 [CS Live Reply] Berhasil terkirim ke ${toJid}: "${text}"`);
     } catch (sendErr: any) {
-      console.warn('Direct send failed (may be offline session in test):', sendErr.message);
+      console.warn(`Direct send to ${toJid} failed (${sendErr.message}), mencoba rute alternatif...`);
+      const altJid = toJid.endsWith('@lid')
+        ? `${rawTarget.replace(/\D/g, '')}@s.whatsapp.net`
+        : `${rawTarget}@lid`;
+      try {
+        await SessionManager.sendMessage(conversation.whatsappAccountId, altJid, text);
+        console.log(`📤 [CS Live Reply Fallback] Berhasil terkirim via ${altJid}: "${text}"`);
+      } catch (fallbackErr: any) {
+        console.error('All send attempts failed:', fallbackErr.message);
+      }
     }
 
     // 2. Record Message with explicit AGENT ID & Name Snapshot

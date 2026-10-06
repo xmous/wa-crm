@@ -107,44 +107,71 @@ campaignRouter.post('/', async (req: Request, res: Response) => {
       }
     }
 
-    const campaign = await prisma.broadcastCampaign.create({
-      data: {
-        title,
-        messageTemplate,
-        status: 'PROCESSING',
-        totalTargets: validTargets.length
-      }
-    });
+    const result = await prisma.$transaction(async (tx) => {
+      const campaign = await tx.broadcastCampaign.create({
+        data: {
+          title,
+          messageTemplate,
+          status: 'PROCESSING',
+          totalTargets: validTargets.length
+        }
+      });
 
-    const queueItems = validTargets.map(target => {
-      const contactName = target.name || contactMap.get(target.cleanNumber) || '';
-      let rendered = parseSpintax(messageTemplate);
+      const queueItems = validTargets.map(target => {
+        const contactName = target.name || contactMap.get(target.cleanNumber) || '';
+        let rendered = parseSpintax(messageTemplate);
 
-      if (contactName) {
-        rendered = rendered.replace(/\{nama\}|\{name\}/gi, contactName);
-      } else {
-        // Fallback: cleanly remove placeholder if contact has no name
-        rendered = rendered.replace(/\s*\{nama\}|\s*\{name\}/gi, '');
-      }
+        if (contactName) {
+          rendered = rendered.replace(/\{nama\}|\{name\}/gi, contactName);
+        } else {
+          // Fallback: cleanly remove placeholder if contact has no name
+          rendered = rendered.replace(/\s*\{nama\}|\s*\{name\}/gi, '');
+        }
 
-      return {
-        campaignId: campaign.id,
-        whatsappAccountId: targetAccountId,
-        recipientPhone: target.cleanNumber,
-        renderedText: rendered.trim(),
-        status: 'QUEUED' as const
-      };
-    });
+        return {
+          campaignId: campaign.id,
+          whatsappAccountId: targetAccountId,
+          recipientPhone: target.cleanNumber,
+          renderedText: rendered.trim(),
+          status: 'QUEUED' as const
+        };
+      });
 
-    await prisma.broadcastQueue.createMany({
-      data: queueItems
+      await tx.broadcastQueue.createMany({
+        data: queueItems
+      });
+
+      return { campaign, totalQueued: queueItems.length };
     });
 
     return res.status(201).json({
       success: true,
-      data: campaign,
-      totalQueued: queueItems.length
+      data: result.campaign,
+      totalQueued: result.totalQueued
     });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/campaigns/:id - Delete single campaign and its queues
+campaignRouter.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await prisma.broadcastQueue.deleteMany({ where: { campaignId: id } });
+    await prisma.broadcastCampaign.delete({ where: { id } });
+    return res.json({ success: true, message: 'Kampanye berhasil dihapus' });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/campaigns - Clear all campaign history
+campaignRouter.delete('/', async (_req: Request, res: Response) => {
+  try {
+    await prisma.broadcastQueue.deleteMany({});
+    await prisma.broadcastCampaign.deleteMany({});
+    return res.json({ success: true, message: 'Semua riwayat kampanye berhasil dibersihkan' });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

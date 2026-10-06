@@ -60,12 +60,29 @@ export class QueueDispatcher {
       });
 
       // 1. Simulate Human Presence Typing
-      const toJid = `${job.recipientPhone}@s.whatsapp.net`;
+      let toJid = job.recipientPhone;
+      if (!toJid.includes('@')) {
+        if (!toJid.startsWith('62') && !toJid.startsWith('0') && toJid.length >= 13) {
+          toJid = `${toJid}@lid`;
+        } else {
+          let clean = toJid.replace(/\D/g, '');
+          if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+          toJid = `${clean}@s.whatsapp.net`;
+        }
+      }
       await SessionManager.simulateTyping(accountId, toJid, 2000);
 
-      // 2. Dispatch Message with failure protection
+      // 2. Dispatch Message with dual-fallback protection
       try {
-        await SessionManager.sendMessage(accountId, toJid, job.renderedText);
+        try {
+          await SessionManager.sendMessage(accountId, toJid, job.renderedText);
+        } catch (firstErr: any) {
+          console.warn(`[Broadcast] Gagal kirim ke ${toJid} (${firstErr.message}), mencoba rute alternatif...`);
+          const altJid = toJid.endsWith('@lid')
+            ? `${job.recipientPhone.replace(/\D/g, '')}@s.whatsapp.net`
+            : `${job.recipientPhone}@lid`;
+          await SessionManager.sendMessage(accountId, altJid, job.renderedText);
+        }
 
         // 3. Update Database records on success
         const [_, __, updatedCampaign] = await prisma.$transaction([

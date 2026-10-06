@@ -1319,6 +1319,11 @@ function initBroadcast() {
     });
   }
 
+  const clearCampaignsBtn = document.getElementById('btn-clear-campaigns');
+  if (clearCampaignsBtn) {
+    clearCampaignsBtn.addEventListener('click', clearAllCampaigns);
+  }
+
   loadCampaigns();
   updateContactsCountBadge();
   updateMockupPreview();
@@ -1380,7 +1385,7 @@ function renderCampaignsTable() {
   if (!tbody) return;
 
   if (state.campaigns.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:20px; color:#64748b;">Belum ada riwayat kampanye broadcast.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px; color:#64748b;">Belum ada riwayat kampanye broadcast.</td></tr>';
     return;
   }
 
@@ -1391,9 +1396,46 @@ function renderCampaignsTable() {
       <td><span style="color:var(--brand-green); font-weight:700;">${c.sentCount}</span> / ${c.totalTargets}</td>
       <td><span class="badge-tag">${c.status}</span></td>
       <td>${new Date(c.createdAt).toLocaleDateString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+      <td>
+        <button type="button" class="btn btn-outline btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.3); padding:4px 8px; font-size:0.75rem;" onclick="deleteCampaign('${c.id}')" title="Hapus Kampanye">
+          🗑️ Hapus
+        </button>
+      </td>
     </tr>
   `).join('');
 }
+
+window.deleteCampaign = async function(id) {
+  if (!confirm('Apakah Anda yakin ingin menghapus riwayat kampanye ini?')) return;
+  try {
+    const res = await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Kampanye berhasil dihapus', 'success');
+      loadCampaigns();
+    } else {
+      showToast(json.error || 'Gagal menghapus kampanye', 'error');
+    }
+  } catch (err) {
+    showToast('Kesalahan: ' + err.message, 'error');
+  }
+};
+
+window.clearAllCampaigns = async function() {
+  if (!confirm('Apakah Anda yakin ingin membersihkan seluruh riwayat kampanye?')) return;
+  try {
+    const res = await fetch('/api/campaigns', { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      showToast('Semua riwayat kampanye berhasil dibersihkan', 'success');
+      loadCampaigns();
+    } else {
+      showToast(json.error || 'Gagal membersihkan kampanye', 'error');
+    }
+  } catch (err) {
+    showToast('Kesalahan: ' + err.message, 'error');
+  }
+};
 
 // ==========================================================================
 // View 6: Reports & Analytics Module

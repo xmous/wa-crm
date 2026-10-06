@@ -406,7 +406,12 @@
 
       <!-- Campaign History Table -->
       <div class="section-card history-card">
-        <h2>Riwayat Kampanye Broadcast</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h2 style="margin:0;">Riwayat Kampanye Broadcast</h2>
+          <button type="button" class="btn btn-outline btn-sm" id="btn-clear-campaigns" style="color:#ef4444; border-color:rgba(239,68,68,0.4);">
+            🗑️ Bersihkan Semua Riwayat
+          </button>
+        </div>
         <div class="table-responsive">
           <table class="styled-table" id="campaigns-table">
             <thead>
@@ -416,10 +421,11 @@
                 <th>Terkirim</th>
                 <th>Status</th>
                 <th>Dibuat</th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody id="campaigns-tbody">
-              <tr><td colspan="5" class="text-center">Belum ada riwayat kampanye.</td></tr>
+              <tr><td colspan="6" class="text-center">Belum ada riwayat kampanye.</td></tr>
             </tbody>
           </table>
         </div>
