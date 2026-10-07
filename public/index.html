@@ -519,47 +519,7 @@
     </section>
   </main>
 
-  <!-- Modal 1: Login & Ganti Pengguna -->
-  <div class="modal-overlay" id="login-modal" style="display:none;">
-    <div class="modal-card login-card">
-      <div class="modal-header">
-        <div>
-          <h3>🔐 Masuk ke WA-CRM</h3>
-          <p class="modal-subtitle">Pilih pengguna atau masukkan kredensial akun staf Anda.</p>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="quick-login-box">
-          <span class="quick-title">Pilih Akun Demo Cepat:</span>
-          <div class="quick-login-buttons">
-            <button type="button" class="btn-quick-login" data-email="admin@wa-crm.io" data-pass="password123">
-              👑 Admin Utama (Akses Penuh)
-            </button>
-            <button type="button" class="btn-quick-login" data-email="siti@wa-crm.io" data-pass="password123">
-              👩‍💼 Siti Nurhaliza (CS-1)
-            </button>
-            <button type="button" class="btn-quick-login" data-email="budi@wa-crm.io" data-pass="password123">
-              👨‍💼 Budi Santoso (CS-2)
-            </button>
-          </div>
-        </div>
-
-        <form id="login-form">
-          <div class="form-group">
-            <label for="login-email">Email Akun:</label>
-            <input type="email" id="login-email" required placeholder="admin@wa-crm.io">
-          </div>
-          <div class="form-group">
-            <label for="login-password">Password:</label>
-            <input type="password" id="login-password" required placeholder="••••••••">
-          </div>
-          <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-submit-login">
-            Masuk ke Sistem
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
+  <!-- Modal: QR Code WhatsApp -->
 
   <!-- Modal 2: QR Code WhatsApp -->
   <div class="modal-overlay" id="qr-modal" style="display:none;">
@@ -709,11 +669,13 @@
           <input type="email" id="login-email" required placeholder="nama@perusahaan.com" class="styled-input" autocomplete="username">
         </div>
         <div class="form-group">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label for="login-password" style="margin:0;">Kata Sandi (Password):</label>
-            <button type="button" id="btn-toggle-pwd" style="background:none; border:none; color:var(--accent-blue); font-size:0.75rem; cursor:pointer; padding:0;">👁️ Lihat</button>
+          <label for="login-password">Kata Sandi (Password):</label>
+          <div style="position: relative; display: flex; align-items: center;">
+            <input type="password" id="login-password" required placeholder="Masukkan kata sandi..." class="styled-input" autocomplete="current-password" style="padding-right: 44px; width: 100%;">
+            <button type="button" id="btn-toggle-pwd" class="btn-toggle-pwd" aria-label="Lihat kata sandi" title="Tampilkan / Sembunyikan Kata Sandi">
+              👁️
+            </button>
           </div>
-          <input type="password" id="login-password" required placeholder="Masukkan kata sandi..." class="styled-input" autocomplete="current-password">
         </div>
         <div id="login-error-msg" class="login-error" style="display: none;"></div>
         <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block btn-lg" style="margin-top: 10px;">
@@ -727,6 +689,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=2.0.3"></script>
 </body>
 </html>

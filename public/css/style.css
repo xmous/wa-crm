@@ -1447,37 +1447,7 @@ select:focus {
   margin-bottom: 16px;
 }
 
-.quick-title {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
 
-.quick-login-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.btn-quick-login {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.82rem;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-quick-login:hover {
-  background: var(--brand-teal);
-  color: white;
-  border-color: var(--brand-teal);
-}
 
 .qr-canvas-wrapper {
   margin: 20px auto;
@@ -1654,6 +1624,34 @@ select:focus {
   border-color: var(--brand-green);
   box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.2);
   background: rgba(11, 17, 32, 0.95);
+}
+
+.btn-toggle-pwd {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  user-select: none;
+  border-radius: 6px;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.btn-toggle-pwd:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.08);
+}
+
+.btn-toggle-pwd:active {
+  transform: scale(0.95);
 }
 
 .login-error {

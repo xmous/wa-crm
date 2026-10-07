@@ -223,13 +223,22 @@ function setupAuthEventListeners() {
 
   // Toggle Password Visibility
   const btnTogglePwd = document.getElementById('btn-toggle-pwd');
-  const pwdInput = document.getElementById('login-password');
-  if (btnTogglePwd && pwdInput) {
-    btnTogglePwd.addEventListener('click', () => {
-      const isPwd = pwdInput.type === 'password';
-      pwdInput.type = isPwd ? 'text' : 'password';
-      btnTogglePwd.textContent = isPwd ? '🙈 Sembunyi' : '👁️ Lihat';
-    });
+  if (btnTogglePwd) {
+    btnTogglePwd.onclick = function(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const pwdInput = document.getElementById('login-password');
+      if (!pwdInput) return;
+      const isCurrentlyPwd = (pwdInput.type === 'password');
+      pwdInput.type = isCurrentlyPwd ? 'text' : 'password';
+      btnTogglePwd.innerHTML = isCurrentlyPwd ? '🙈' : '👁️';
+      btnTogglePwd.setAttribute('aria-label', isCurrentlyPwd ? 'Sembunyikan kata sandi' : 'Lihat kata sandi');
+      btnTogglePwd.setAttribute('title', isCurrentlyPwd ? 'Sembunyikan Kata Sandi' : 'Tampilkan Kata Sandi');
+      pwdInput.focus();
+    };
+    window.toggleLoginPassword = btnTogglePwd.onclick;
   }
 
   // Login Form Submission
