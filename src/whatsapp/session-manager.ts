@@ -304,6 +304,63 @@ export class SessionManager {
     return await socket.sendMessage(toJid, { text });
   }
 
+  static async sendMedia(
+    accountId: string,
+    toJid: string,
+    options: {
+      mediaUrl: string;
+      caption?: string;
+      mediaType?: 'image' | 'document' | 'video' | 'audio' | 'auto';
+      fileName?: string;
+      mimetype?: string;
+    }
+  ): Promise<any> {
+    const socket = this.getSocket(accountId);
+    if (!socket) throw new Error(`WhatsApp account ${accountId} is not connected.`);
+
+    const { mediaUrl, caption, fileName, mimetype } = options;
+    let type = options.mediaType || 'auto';
+
+    if (type === 'auto') {
+      const lowerUrl = mediaUrl.toLowerCase().split('?')[0];
+      if (lowerUrl.match(/\.(jpeg|jpg|png|gif|webp)$/i)) {
+        type = 'image';
+      } else if (lowerUrl.match(/\.(mp4|mov|avi|mkv)$/i)) {
+        type = 'video';
+      } else if (lowerUrl.match(/\.(mp3|wav|ogg|m4a)$/i)) {
+        type = 'audio';
+      } else {
+        type = 'document';
+      }
+    }
+
+    if (type === 'image') {
+      return await socket.sendMessage(toJid, {
+        image: { url: mediaUrl },
+        caption: caption || undefined
+      });
+    } else if (type === 'video') {
+      return await socket.sendMessage(toJid, {
+        video: { url: mediaUrl },
+        caption: caption || undefined
+      });
+    } else if (type === 'audio') {
+      return await socket.sendMessage(toJid, {
+        audio: { url: mediaUrl },
+        mimetype: mimetype || 'audio/mp4'
+      });
+    } else {
+      const docName = fileName || mediaUrl.split('/').pop()?.split('?')[0] || 'document.pdf';
+      const docMime = mimetype || (docName.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+      return await socket.sendMessage(toJid, {
+        document: { url: mediaUrl },
+        fileName: docName,
+        mimetype: docMime,
+        caption: caption || undefined
+      });
+    }
+  }
+
   static async restoreAllSessions(): Promise<void> {
     try {
       const accounts = await prisma.whatsappAccount.findMany({

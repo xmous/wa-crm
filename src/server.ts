@@ -9,6 +9,7 @@ import { reportRouter } from './api/reports';
 import { accountRouter } from './api/accounts';
 import { contactRouter } from './api/contacts';
 import { botRuleRouter } from './api/bot-rules';
+import { gatewayRouter } from './api/gateway';
 import { sessionEvents } from './whatsapp/session-manager';
 import { requireAuth, requireRole } from './middleware/auth';
 
@@ -24,6 +25,9 @@ export function createServer() {
 
   // REST API Routes
   app.use('/api/auth', authRouter);
+
+  // External Integration Gateway API (Protected by API Key)
+  app.use('/api/v1', gatewayRouter);
 
   // Protected routes (Admin & Agent)
   app.use('/api/conversations', requireAuth, conversationRouter);
